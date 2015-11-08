@@ -1,0 +1,23 @@
+{
+    "project_type": "javascript",
+
+    "debugMode" : 1,
+    "showFPS" : true,
+    "frameRate" : 60,
+    "id" : "gameCanvas",
+    "renderMode" : 0,
+    "engineDir":"frameworks/cocos2d-html5",
+
+    "modules" : ["cocos2d"],
+
+    "jsList" : [
+        "src/Resource.js",
+        "src/ShowLayer.js",
+        "src/Config.js",
+        "src/OperateLayer.js",
+        "src/FightScene.js",
+        "src/Tools.js",
+        "src/FlowControlLayer.js",
+        "src/StatusCalculateLayer.js"
+    ]
+}
