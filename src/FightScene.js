@@ -10,16 +10,12 @@ var FightScene = cc.Scene.extend({
 		var flowControlLayer = new SysFlowControl();
 		var showLayer = new ShowLayer();
 		var opLayer = new OperateLayer();
-		flowControlLayer.setLayer(showLayer, statusCalculateLayer);
-		opLayer.setLayer(showLayer, flowControlLayer, statusCalculateLayer);
 		this._setEventCenter(flowControlLayer);
 
-
+		this.addChild(showLayer);
 		this.addChild(statusCalculateLayer);
 		this.addChild(flowControlLayer);
 		this.addChild(opLayer);
-		this.addChild(showLayer);
-
 
 		console.log("fight scene OK!!!");
 	},

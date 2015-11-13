@@ -1,6 +1,7 @@
 
 var ShowLayer = cc.Layer.extend({
 
+    eventCenter: null,
     //player click to attack
     attackButton: null,
     //player click to defence
@@ -16,13 +17,9 @@ var ShowLayer = cc.Layer.extend({
     //player click to make movement action from position button
     moveButtons: new Array(4),
     //player click to adjust energy status
-    energyButtons: [],
+    energyDots: new Array(3),
     //show player`s energy status
-    energyBars: [],
-    //energy quantity of player
-    energyLabelsMe: new Array(5),
-    //energy quantity of enemy
-    energyLabelsEnemy: new Array(5),
+    energyBars: new Array(3),
 
     //show the attack progress bar
     attackProgress: null,
@@ -38,10 +35,6 @@ var ShowLayer = cc.Layer.extend({
     positionStatus: null,
     //the noAction status of enemy
     actionStatus: null,
-    //the energy dot of enemy
-    energyDotEnemy: null,
-    //the energy progress bar of enemy
-    energyBarEnemy: null,
 
     attackEasyUp: null,
     attackHardUp: null,
@@ -51,17 +44,22 @@ var ShowLayer = cc.Layer.extend({
     defenceProgressIn: null,
 
     sysControlLayer: null,
+    energyIndex: null,
+
+    Energy: {
+        player: new Array(5),
+        enemy: new Array(5),
+    },
+
 
     ctor:function () {
         this._super();
-
         this.setName(Config.SHOW_LAYER);
+
+        this.energyIndex = 0;
         this._setElements();
-        this._setAction();
 
         console.log("show layer OK!!!");
-
-        return true;
     },
 
     /**
@@ -69,12 +67,39 @@ var ShowLayer = cc.Layer.extend({
      * below is the attack action series
      *
      */
+    attackBegan: function(easyTime, hardTime) {
+        if (this.attackEasyUp == null) {
+            this.attackEasyUp = cc.sequence(
+                cc.moveTo(easyTime, cc.p(this.attackButton.x + Config.ATTACK_PROGRESS_X, this.attackButton.y + Config.ATTACK_PROGRESS_Y + 300)),
+                cc.callFunc(function() {
+                    this.eventCenter.dispatchEvent(Config.events.EASY_READY, {role: Config.PLAYER, time: Date.now()});
+                }.bind(this), this)
+            );
+        }
+        if (this.attackHardUp == null) {
+            this.attackHardUp = cc.sequence(
+                cc.moveTo(hardTime, cc.p(this.attackButton.x + Config.ATTACK_PROGRESS_X, this.attackButton.y + Config.ATTACK_PROGRESS_Y + 300)),
+                cc.callFunc(function() {
+                    this.eventCenter.dispatchEvent(Config.events.HARD_READY, {role: Config.PLAYER, time: Date.now()});
+                }.bind(this), this)
+            );
+        }
+        if (!this.easyButton.getParent() && !this.hardButton.getParent()) {
+            this.addChild(this.easyButton, 1, Config.EASY_ATTACK_MODE);//, 1, "easy");
+            this.addChild(this.hardButton, 1, Config.HARD_ATTACK_MODE);//, 1, "easy");
+        }
+    },
     easyAttackReady: function() {
         this.easyButton.setTexture(res.easyGo);
     },
     easyAttackBegin: function() {
         this.easyButton.setTexture(res.easyAttack);
         this.hardButton.setTexture(res.hardNo);
+        var attackProgress = this.attackProgress;
+        var upAction = this.attackEasyUp;
+        if (upAction.getTarget() == null) {
+            attackProgress.runAction(upAction);
+        }
     },
     hardAttackReady: function() {
         this.hardButton.setTexture(res.hardGo);
@@ -82,6 +107,11 @@ var ShowLayer = cc.Layer.extend({
     hardAttackBegin: function() {
         this.hardButton.setTexture(res.hardAttack);
         this.easyButton.setTexture(res.easyNo);
+        var attackProgress = this.attackProgress;
+        var upAction = this.attackHardUp;
+        if (upAction.getTarget() == null) {
+            attackProgress.runAction(upAction);
+        }
     },
     attackFinished: function() {
         this.attackProgress.y = this.attackButton.y + Config.ATTACK_PROGRESS_Y;
@@ -120,14 +150,31 @@ var ShowLayer = cc.Layer.extend({
 
         this.attackFinished();
     },
-    adjustPositionFinished: function() {
-    },
 
     /**
      *
      * below is the position action series.
      *
      */
+    adjustPositionBegan: function(time) {
+        if (this.positionMovement == null) {
+            this.positionMovement = cc.sequence(
+                cc.moveTo(time, cc.p(this.positionButton.x, this.positionButton.y)),
+                cc.callFunc(function() {
+                    for(var i in this.moveButtons) {
+                        var e = this.moveButtons[i];
+                        if (!e.getParent()) {
+                            this.addChild(e);
+                        }
+                    }
+                }.bind(this), this));
+        }
+        var positionMovement = this.positionMovement;
+        var positionProgress = this.positionProgress;
+        if (positionMovement.getTarget() == null) {
+            positionProgress.runAction(positionMovement);
+        }
+    },
     adjustPositionEnded: function(FLAG) {
         var positionMovement = this.positionMovement;
         var positionProgress = this.positionProgress;
@@ -191,48 +238,62 @@ var ShowLayer = cc.Layer.extend({
     },
 
     /**
+     * update function is used to listen the frame event, and no-stop action, like energy bar move up and down
+     */
+
+    setEnergyIndex: function(index) {
+        this.energyIndex = index;
+    },
+    moveEnergyBar: function(variation, FLAG) {
+        var bar = this.energyBars[FLAG];
+        var yLimit = bar.getParent().getStencil().y - Config.MOVE_BUTTON_Y * 2;
+        var height = bar.y + variation;
+        var lastIndex = (this.energyIndex - 1 + Config.ENERGY_LENGTH) % Config.ENERGY_LENGTH;
+        bar.y = height;
+        if (height < yLimit) {
+            this.eventCenter.dispatchEvent(Config.events.ENERGY_DURATION_BEGIN, {role: Config.PLAYER, lastIndex: lastIndex, index: this.energyIndex, time: Date.now()})
+        }
+    },
+    nextEnergyRotation: function(index, FLAG) {
+        var bar = this.energyBars[FLAG];
+        var dot = this.energyDots[FLAG];
+        bar.setTexture(res["Bar" + index]);
+        bar.y = Config.CENTER_Y + Config.ENERGY_Y;
+        dot.setTexture(res["Dot" + index]);
+        this.energyIndex = index;
+    },
+    energyRotation: function() {
+        this.eventCenter.dispatchEvent(Config.events.PLAYER_ENERGY_ROTATION, {role: Config.PLAYER, index: this.energyIndex, time: Date.now()});
+    },
+    optimizedSchedule: function(callback, interval) {
+        var then = Date.now();
+        interval = interval * 1000;
+        this.schedule(function() {
+            var now = Date.now();
+            var delta = now - then;
+            if(delta > interval) {
+                then = now - (delta % interval);
+                callback.call(this);
+            }
+        }.bind(this), 0);
+    },
+    setEnergyLabel: function(FLAG, index, energy) {
+        this.Energy[FLAG][index].setString(energy);
+    },
+    onEnter: function() {
+        this._super();
+        this.eventCenter = this.getParent().eventCenter;
+        this.scheduleOnce(function() {
+            this.eventCenter.dispatchEvent(Config.events.SET_ENERGY_ROTATION_BEGIN_TIME, {role: Config.PLAYER, index: this.energyIndex, time: Date.now()});
+        }.bind(this));
+        this.optimizedSchedule(this.energyRotation, Config.duration.FRAME_TIME / 1000);
+    },
+
+    /**
      *
-     * below is the showlayer private method.
+     * below is the show layer private method.
      * @private
      */
-    _setAction: function() {
-        var easyTime = Config.duration.EASY_BUTTON / 1000;
-        var hardTime = Config.duration.HARD_BUTTON / 1000;
-        var positionTime = Config.duration.ADJUST_POSITION_BUTTON / 1000;
-        this.attackEasyUp = cc.sequence(
-            cc.moveTo(easyTime, cc.p(this.attackButton.x + Config.ATTACK_PROGRESS_X, this.attackButton.y + Config.ATTACK_PROGRESS_Y + 300)),
-            cc.callFunc(function() {
-                //_dispatchCustomEvent(Config.events.EASY_READY, Config.PLAYER);
-                this.getParent().eventCenter.dispatchEvent(Config.events.EASY_READY, {role: Config.PLAYER, time: new Date().getTime()});
-            }.bind(this), this)
-        );
-        this.attackHardUp = cc.sequence(
-            cc.moveTo(hardTime, cc.p(this.attackButton.x + Config.ATTACK_PROGRESS_X, this.attackButton.y + Config.ATTACK_PROGRESS_Y + 300)),
-            cc.callFunc(function() {
-                //_dispatchCustomEvent(Config.events.HARD_READY, Config.PLAYER);
-                this.getParent().eventCenter.dispatchEvent(Config.events.HARD_READY, {role: Config.PLAYER, time: new Date().getTime()});
-            }.bind(this), this)
-        );
-        this.positionMovement = cc.sequence(
-            cc.moveTo(positionTime, cc.p(this.positionButton.x, this.positionButton.y)),
-            cc.callFunc(function() {
-                for(var i in this.moveButtons) {
-                    var e = this.moveButtons[i];
-                    if (!e.getParent()) {
-                        this.addChild(e);
-                    }
-                }
-                //_dispatchCustomEvent(Config.events.POSITION_END, Config.PLAYER);
-                //this.getParent().eventCenter.dispatchEvent(Config.events.POSITION_END, {role: Config.PLAYER, time: new Date().getTime()});
-            }.bind(this), this)
-        );
-        /*
-         var _dispatchCustomEvent = function(event, role) {
-         this.getParent().eventCenter.dispatchEvent(event, {role: role, time: new Date().getTime()});
-         };
-         */
-        //this.attackProgressDown = cc.moveTo(easyTime, cc.p(this.attackButton.x + Config.ATTACK_PROGRESS_X, this.attackButton.y + Config.ATTACK_PROGRESS_Y));
-    },
     _setElements: function() {
         var bg = new cc.Sprite(res.backGround);
         bg.x = Config.CENTER_X;
@@ -284,31 +345,35 @@ var ShowLayer = cc.Layer.extend({
         hardAttack.y = Config.CENTER_Y + Config.HARD_Y;
         hardAttack.setName(Config.HARD_ATTACK_MODE);
 
-        var energyLeftBar = new cc.Sprite(res.whiteBar);
+        var energyLeftBar = new cc.Sprite(res["Bar" + this.energyIndex]);
         energyLeftBar.x = Config.CENTER_X + Config.ENERGY_L_X;
         energyLeftBar.y = Config.CENTER_Y + Config.ENERGY_Y;
-        this.addChild(energyLeftBar);
+        var energyLeftStencil = new cc.Sprite(res.Bar0);
+        energyLeftStencil.x = energyLeftBar.x;
+        energyLeftStencil.y = energyLeftBar.y;
+        var energyLeftMask = new cc.ClippingNode(energyLeftStencil);
+        energyLeftMask.addChild(energyLeftBar);
+        this.addChild(energyLeftMask);
 
-        var energyRightBar = new cc.Sprite(res.redBar);
+        var energyRightBar = new cc.Sprite(res["Bar" + this.energyIndex]);
         energyRightBar.x = Config.CENTER_X + Config.ENERGY_R_X;
         energyRightBar.y = Config.CENTER_Y + Config.ENERGY_Y;
-        this.addChild(energyRightBar);
+        var energyRightStencil = new cc.Sprite(res.Bar0);
+        energyRightStencil.x = energyRightBar.x;
+        energyRightStencil.y = energyRightBar.y;
+        var energyRightMask = new cc.ClippingNode(energyRightStencil);
+        energyRightMask.addChild(energyRightBar);
+        this.addChild(energyRightMask);
 
-        this.energyBars[Config.LEFT_SERIES] = energyLeftBar;
-        this.energyBars[Config.RIGHT_SERIES] = energyRightBar;
-
-        var energyLeftDot = new cc.Sprite(res.whiteDot);
+        var energyLeftDot = new cc.Sprite(res["Dot" + this.energyIndex]);
         energyLeftDot.x = Config.CENTER_X + Config.ENERGY_L_X;
         energyLeftDot.y = Config.CENTER_Y + Config.DOT_Y;
         this.addChild(energyLeftDot);
 
-        var energyRightDot = new cc.Sprite(res.redDot);
+        var energyRightDot = new cc.Sprite(res["Dot" + this.energyIndex]);
         energyRightDot.x = Config.CENTER_X + Config.ENERGY_R_X;
         energyRightDot.y = Config.CENTER_Y + Config.DOT_Y;
         this.addChild(energyRightDot);
-
-        this.energyButtons[Config.LEFT_SERIES] = energyLeftDot;
-        this.energyButtons[Config.RIGHT_SERIES] = energyRightDot;
 
         var defenceProgress = new cc.Sprite(res.buttonProgress);
         defenceProgress.x = defence.x;
@@ -366,23 +431,28 @@ var ShowLayer = cc.Layer.extend({
         faceEnemy.y = Config.CENTER_Y + Config.FACE_Y;
         this.addChild(faceEnemy);
 
-        var energyEnemyDot = new cc.Sprite(res.greenDot);
+        var energyEnemyDot = new cc.Sprite(res.Dot2);
         energyEnemyDot.x = Config.CENTER_X + Config.DOT_ENEMY_X;
         energyEnemyDot.y = Config.CENTER_Y + Config.DOT_ENEMY_Y;
         this.addChild(energyEnemyDot);
 
-        var energyEnemyBar = new cc.Sprite(res.greenBar);
+        var energyEnemyBar = new cc.Sprite(res.Bar2);
         energyEnemyBar.x = Config.CENTER_X + Config.ENERGY_ENEMY_X;
         energyEnemyBar.y = Config.CENTER_Y + Config.ENERGY_ENEMY_Y;
-        this.addChild(energyEnemyBar);
-
+        var energyEnemyStencil = new cc.Sprite(res.Bar2);
+        energyEnemyStencil.x = energyEnemyBar.x;
+        energyEnemyStencil.y = energyEnemyBar.y;
+        var energyEnemyMask = new cc.ClippingNode(energyEnemyStencil);
+        energyEnemyMask.addChild(energyEnemyBar);
+        this.addChild(energyEnemyMask);
+        
         for (var i = 0; i < Config.ENERGY_LENGTH; i++) {
-            var numberMe = new cc.Sprite("res/" + i + "Rec.png");
+            var numberMe = new cc.Sprite(res["Rec" + i]);
             numberMe.x = Config.CENTER_X + Config.ENERGY_NUMBER_X + i * Config.ENERGY_NUMBER_INTERVAL;
             numberMe.y = Config.CENTER_Y + Config.ENERGY_NUMBER_ME_Y;
             this.addChild(numberMe);
 
-            var numberEnemy = new cc.Sprite("res/" + i + "Rec.png");
+            var numberEnemy = new cc.Sprite(res["Rec" + i]);
             numberEnemy.x = numberMe.x;
             numberEnemy.y = Config.CENTER_Y + Config.ENERGY_NUMBER_ENEMY_Y;
             this.addChild(numberEnemy);
@@ -392,15 +462,14 @@ var ShowLayer = cc.Layer.extend({
             labelMe.y = numberMe.y;
             labelMe.setColor(Config.ENERGY_LIGHT_COLORS[i]);
             this.addChild(labelMe);
+            this.Energy.player[i] = labelMe;
 
             var labelEnemy = new cc.LabelTTF("48", "arial", 80);
             labelEnemy.x = numberEnemy.x;
             labelEnemy.y = numberEnemy.y;
             labelEnemy.setColor(Config.ENERGY_LIGHT_COLORS[i]);
             this.addChild(labelEnemy);
-
-            this.energyLabelsMe.push(labelMe);
-            this.energyLabelsEnemy.push(labelEnemy);
+            this.Energy.enemy[i] = labelEnemy;
         }
 
         this.attackButton = attackMe;
@@ -417,12 +486,16 @@ var ShowLayer = cc.Layer.extend({
         this.easyButton = easyAttack;
         this.hardButton = hardAttack;
         this.actionStatus = statusEnemy;
-        this.energyDotEnemy = energyEnemyDot;
-        this.energyBarEnemy = energyEnemyBar;
+        this.energyBars[Config.LEFT_SERIES] = energyLeftBar;
+        this.energyBars[Config.RIGHT_SERIES] = energyRightBar;
+        this.energyBars[Config.ENEMY.category] = energyEnemyBar;
+        this.energyDots[Config.LEFT_SERIES] = energyLeftDot;
+        this.energyDots[Config.RIGHT_SERIES] = energyRightDot;
+        this.energyDots[Config.ENEMY.category] = energyEnemyDot;
         this.defenceProgress = defenceProgress;
         this.attackProgress = attackProgress;
         this.positionProgress = positionProgress;
-    }
+    },
 });
 
 
