@@ -14,8 +14,8 @@ var FightScene = cc.Scene.extend({
 
 		this.addChild(showLayer);
 		this.addChild(statusCalculateLayer);
-		this.addChild(flowControlLayer);
 		this.addChild(opLayer);
+		this.addChild(flowControlLayer);
 
 		console.log("fight scene OK!!!");
 	},
@@ -28,7 +28,5 @@ var FightScene = cc.Scene.extend({
 		for(var i in events) {
 			this.eventCenter.addListener(events[i], flowControlLayer[events[i]].bind(flowControlLayer));
 		}
-		this.eventCenter.addListener(Config.HARD_ATTACK_MODE, this.hardAttack);
-		this.eventCenter.addListener(Config.MOVE_BACKWARD, this.moveBackward);
 	}
 });

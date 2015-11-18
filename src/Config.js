@@ -124,12 +124,19 @@ var Config = {
 		HARD_GO: "hardAttackGo",
 		GET_WOUNDED: "getWounded",
 
-		MOVE_ASIDE: "moveAside",
-		MOVE_FORWARD: "moveForward",
-		MOVE_BACKWARD: "moveBackward",
-		ADJUST_FINISHED: "adjustFinished",
+		MOVE_ASIDE_BEGIN: "moveAsideBegin",
+		MOVE_ASIDE_END: "moveAsideEnd",
+		MOVE_FORWARD_BEGIN: "moveForwardBegin",
+		MOVE_FORWARD_END: "moveForwardEnd",
+		MOVE_BACKWARD_BEGIN: "moveBackwardBegin",
+		MOVE_BACKWARD_END: "moveBackwardEnd",
+		OPERATE_ADJUST: "operateAdjust",
+		ADJUST_GO: "adjustPositionGo",
+		ADJUST_TO_FACE: "adjust2Face",
 		POSITION_BEGIN: "positionBegin",
 		POSITION_END: "positionEnd",
+
+		SET_POSITION_LABEL: "setPositionLabel",
 
 		DEFENCE_BEGIN: "defenceBegin",
 		BLOCK_BEGIN: "blockBegin",
@@ -144,7 +151,8 @@ var Config = {
 		PLAYER_ENERGY_ROTATION: "playerEnergyRotation",
 		ENEMY_ENERGY_ROTATION: "enemyEnergyRotation",
 
-		NO_ACTION: "noAction",
+		NO_ACTION_GO: "noActionGo",
+		NO_ACTION_STOP: "noActionStop",
 		SET_ENERGY_LABEL: "setEnergyLabel",
 	},
 
@@ -163,6 +171,13 @@ var Config = {
 		//the duration time that on frame last
 		FRAME_TIME: 20,
 		HIT_TIME: 500,
+		// in the last 250 ms of attack which ends with HIT TIME£¬ the block action will success
+		BLOCK_WINDOW: 250,
+		MAX_NO_ACTON_TIME: 6000,
+		// unit is second
+		NO_ACTION_DELAY_TIME: 100,
+		// when the player click position button to "adjust position", the adjust position window sets the number like below, and the minus with time past. unit ms.
+		ADJUST_POSITION_WINDOW: 5000,
 	},
 
 	/**
@@ -184,14 +199,14 @@ var Config = {
 	 * getWounded can be searched by Config.events.GET_WOUNDED,
 	 * noAction can be searched by Config.events.NO_ACTION,
 	 */
-		easyAttack: {
-			getWounded: 2,
-			noAction: 250,
-		},
-		hardAttack: {
-			getWounded: 4,
-			noAction: 500,
-		},
+	easyAttack: {
+		getWounded: 2,
+		noAction: 250,
+	},
+	hardAttack: {
+		getWounded: 4,
+		noAction: 500,
+	},
 	ATTACK_EFFECT: {
 		defenceAction: {
 			getWounded: -1,

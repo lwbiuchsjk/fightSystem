@@ -27,6 +27,7 @@ var ShowLayer = cc.Layer.extend({
     defenceProgress: null,
     //show the button which like player`s position action progress bar
     positionProgress: null,
+    positionMask: null,
     //the attack status of enemy
     attackStatus: null,
     //the defence status of enemy
@@ -45,6 +46,9 @@ var ShowLayer = cc.Layer.extend({
 
     sysControlLayer: null,
     energyIndex: null,
+
+    noActionPlayer: null,
+    noActionEnemy: null,
 
     Energy: {
         player: new Array(5),
@@ -113,6 +117,22 @@ var ShowLayer = cc.Layer.extend({
             attackProgress.runAction(upAction);
         }
     },
+    attackFlashReady: function(FLAG) {
+        switch(FLAG) {
+            case Config.EASY_ATTACK_MODE: {
+                this.easyAttackReady();
+                this.hardButton.setTexture(res.hardNo);
+                break;
+            }
+            case Config.HARD_ATTACK_MODE: {
+                this.hardAttackReady();
+                this.easyButton.setTexture(res.easyNo);
+                break;
+            }
+        }
+        this.attackProgressActionStopped();
+        this.attackProgress.y = this.attackButton.y + Config.ATTACK_PROGRESS_Y + 300;
+    },
     attackFinished: function() {
         this.attackProgress.y = this.attackButton.y + Config.ATTACK_PROGRESS_Y;
     },
@@ -140,6 +160,10 @@ var ShowLayer = cc.Layer.extend({
             this.easyButton.removeFromParent();
             this.hardButton.removeFromParent();
         }
+        this.attackProgressActionStopped();
+        this.attackFinished();
+    },
+    attackProgressActionStopped: function() {
         if (this.attackEasyUp.getTarget() != null || this.attackHardUp.getTarget() != null) {
             //this.attackProgress.stopAction(this.attackEasyUp);
             this.attackProgress.stopAllActions();
@@ -147,8 +171,12 @@ var ShowLayer = cc.Layer.extend({
             this.attackHardUp.setTarget(null);
             console.log("stop progress");
         }
-
-        this.attackFinished();
+    },
+    noAttack: function() {
+        this.attackButton.setTexture(res.noAttack);
+    },
+    doAttack: function() {
+        this.attackButton.setTexture(res.attack);
     },
 
     /**
@@ -156,34 +184,86 @@ var ShowLayer = cc.Layer.extend({
      * below is the position action series.
      *
      */
-    adjustPositionBegan: function(time) {
-        if (this.positionMovement == null) {
-            this.positionMovement = cc.sequence(
-                cc.moveTo(time, cc.p(this.positionButton.x, this.positionButton.y)),
-                cc.callFunc(function() {
-                    for(var i in this.moveButtons) {
-                        var e = this.moveButtons[i];
-                        if (!e.getParent()) {
-                            this.addChild(e);
-                        }
-                    }
-                }.bind(this), this));
+    noPosition: function() {
+        this.positionButton.setTexture(res.noPosition);
+    },
+    doPosition: function() {
+        this.positionButton.setTexture(res.position);
+    },
+    setPositionProgressDirection: function(FLAG, time) {
+        var positionProgress = this.positionProgress;
+        var positionMovement = this.positionMovement;
+        this.positionMask.setInverted(true);
+        positionProgress.attr({
+            x: this.positionButton.x,
+            y: this.positionButton.y
+        });
+        var direction;
+        switch(FLAG) {
+            case Config.LEFT_SERIES: {
+                direction = cc.p(this.positionButton.x - Config.SLIDE_X, this.positionButton.y);
+                break;
+            }
+            case Config.RIGHT_SERIES: {
+                direction = cc.p(this.positionButton.x + Config.SLIDE_X, this.positionButton.y);
+                break;
+            }
+            case Config.MOVE_FORWARD: {
+                direction = cc.p(this.positionButton.x, this.positionButton.y + Config.MOVE_BUTTON_Y);
+                break;
+            }
+            case Config.MOVE_BACKWARD: {
+                direction = cc.p(this.positionButton.x, this.positionButton.y - Config.MOVE_BUTTON_Y);
+                break;
+            }
         }
+        positionMovement = cc.moveTo(time, direction);
+        if (positionMovement.getTarget() == null) {
+            positionProgress.runAction(positionMovement);
+        }
+    },
+    showFlashPosition: function(FLAG) {
+        var img = this.moveButtons[FLAG];
+        if (img.getParent() == null) {
+            this.addChild(img);
+        }
+        this.resetPositionProgress();
+    },
+    adjustPositionBegan: function(time) {
+        this.positionProgress.attr({
+            x: this.positionButton.x + Config.SLIDE_X,
+            y: this.positionButton.y
+        });
+        this.positionMovement = cc.sequence(
+            cc.moveTo(time, cc.p(this.positionButton.x, this.positionButton.y)),
+            cc.callFunc(function() {
+                for(var i in this.moveButtons) {
+                    var e = this.moveButtons[i];
+                    if (!e.getParent()) {
+                        this.addChild(e, 1);
+                    }
+                }
+                this.positionMovement.setTarget(null);
+            }.bind(this), this));
         var positionMovement = this.positionMovement;
         var positionProgress = this.positionProgress;
         if (positionMovement.getTarget() == null) {
             positionProgress.runAction(positionMovement);
         }
     },
-    adjustPositionEnded: function(FLAG) {
+    resetPositionProgress: function() {
         var positionMovement = this.positionMovement;
         var positionProgress = this.positionProgress;
+        if (positionMovement.getTarget() != null) { //!!! getTarget not getTarget()
+            positionProgress.stopAllActions();
+            positionMovement.setTarget(null);
+        }
+        positionProgress.x = this.positionButton.x + Config.SLIDE_X;
+    },
+    adjustPositionEnded: function(FLAG) {
         if (FLAG == null || FLAG == Config.WRONG_ACTION) {
-            if (positionMovement.getTarget() != null) { //!!! getTarget not getTarget()
-                positionProgress.stopAllActions();
-                positionMovement.setTarget(null);
-            }
-            positionProgress.x = this.positionButton.x + Config.SLIDE_X;
+            this.resetPositionProgress();
+            this.positionMask.setInverted(false);
         }
         if (FLAG != Config.WRONG_ACTION) {
             for (var i in this.moveButtons) {
@@ -202,6 +282,15 @@ var ShowLayer = cc.Layer.extend({
      * below is the defence action series.
      *
      */
+    noDefence: function() {
+        this.defenceButton.setTexture(res.noDefence);
+        this.defenceProgress.setVisible(false);
+        this.blockEnd();
+    },
+    doDefence: function() {
+        this.defenceButton.setTexture(res.defence);
+        this.defenceProgress.setVisible(true);
+    },
     defenceAction: function(FLAG, time) {
         var progress = this.defenceProgress;
         var generateAction = function(stop, start) {
@@ -287,6 +376,18 @@ var ShowLayer = cc.Layer.extend({
             this.eventCenter.dispatchEvent(Config.events.SET_ENERGY_ROTATION_BEGIN_TIME, {role: Config.PLAYER, index: this.energyIndex, time: Date.now()});
         }.bind(this));
         this.optimizedSchedule(this.energyRotation, Config.duration.FRAME_TIME / 1000);
+    },
+    /**
+     * status action function
+     */
+    setPositionLabel: function(label) {
+        console.log(label);
+    },
+    enemyNoActionGo: function() {
+
+    },
+    enemyNoActionStop: function() {
+
     },
 
     /**
@@ -405,8 +506,7 @@ var ShowLayer = cc.Layer.extend({
         var positionStencil = new cc.Sprite(res.buttonProgress);
         positionStencil.x = position.x;
         positionStencil.y = position.y;
-        var positionProgressMask = new cc.ClippingNode();
-        positionProgressMask.stencil = positionStencil;
+        var positionProgressMask = new cc.ClippingNode(positionStencil);
         positionProgressMask.addChild(positionProgress);
         //positionProgressMask.setInverted(true);
         this.addChild(positionProgressMask);
@@ -495,6 +595,7 @@ var ShowLayer = cc.Layer.extend({
         this.defenceProgress = defenceProgress;
         this.attackProgress = attackProgress;
         this.positionProgress = positionProgress;
+        this.positionMask = positionProgressMask;
     },
 });
 
