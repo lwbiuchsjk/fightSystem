@@ -45,7 +45,7 @@ var OperateLayer = cc.Layer.extend({
 				var pos = touch.getLocation();
 				var target = event.getCurrentTarget();
 				if (cc.rectContainsPoint(target.getBoundingBox(), pos)) {
-					eventCenter.dispatchEvent(Config.events.ATTACK_BEGIN, {role: Config.PLAYER});
+					eventCenter.dispatchEvent(Config.events.ATTACK_BEGIN);
 					cc.eventManager.pauseTarget(that.showLayer.defenceButton);
 					that.showLayer.noDefence();
 					console.info("ATTACK BEGIN!!!");
@@ -98,7 +98,7 @@ var OperateLayer = cc.Layer.extend({
 				that.showLayer.attackEnded();
 				cc.eventManager.resumeTarget(that.showLayer.defenceButton);
 				that.showLayer.doDefence();
-				player.attackEnded();
+				//player.attackEnded();
 
 				return true;
 			}
@@ -221,7 +221,8 @@ var OperateLayer = cc.Layer.extend({
 				if (isBegin) {
 					if (cc.rectContainsPoint(target.getBoundingBox(), pos)) {
 						if (isAdjustPosition) {
-							eventCenter.dispatchEvent(Config.events.ADJUST_GO, {role: Config.PLAYER, time: nowTime})
+							console.log("end");
+							eventCenter.dispatchEvent(Config.events.ADJUST_GO, {role: Config.PLAYER, time: nowTime, FLAG: null})
 						} else {
 							// if not satisfied the adjust position time, then we conclude the operation satisfied the adjust to face time
 							eventCenter.dispatchEvent(Config.events.ADJUST_TO_FACE, {role: Config.PLAYER, time: nowTime})

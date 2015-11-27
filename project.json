@@ -19,6 +19,8 @@
         "src/Tools.js",
         "src/FlowControlLayer.js",
         "src/StatusCalculateLayer.js",
-        "src/Characters.js"
+        "src/Characters.js",
+        "src/AiTemplate.js",
+        "src/EnemyAi.js"
     ]
 }

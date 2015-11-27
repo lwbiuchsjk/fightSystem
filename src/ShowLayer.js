@@ -45,7 +45,8 @@ var ShowLayer = cc.Layer.extend({
     defenceProgressIn: null,
 
     sysControlLayer: null,
-    energyIndex: null,
+    playerEnergyIndex: null,
+    enemyEnergyIndex: null,
 
     noActionPlayer: null,
     noActionEnemy: null,
@@ -55,12 +56,13 @@ var ShowLayer = cc.Layer.extend({
         enemy: new Array(5),
     },
 
+    frameTime: null,
 
     ctor:function () {
         this._super();
         this.setName(Config.SHOW_LAYER);
 
-        this.energyIndex = 0;
+        this.playerEnergyIndex = 0;
         this._setElements();
 
         console.log("show layer OK!!!");
@@ -71,7 +73,7 @@ var ShowLayer = cc.Layer.extend({
      * below is the attack action series
      *
      */
-    attackBegan: function(easyTime, hardTime) {
+    initAttackMovement: function(easyTime, hardTime) {
         if (this.attackEasyUp == null) {
             this.attackEasyUp = cc.sequence(
                 cc.moveTo(easyTime, cc.p(this.attackButton.x + Config.ATTACK_PROGRESS_X, this.attackButton.y + Config.ATTACK_PROGRESS_Y + 300)),
@@ -88,6 +90,8 @@ var ShowLayer = cc.Layer.extend({
                 }.bind(this), this)
             );
         }
+    },
+    attackBegan: function() {
         if (!this.easyButton.getParent() && !this.hardButton.getParent()) {
             this.addChild(this.easyButton, 1, Config.EASY_ATTACK_MODE);//, 1, "easy");
             this.addChild(this.hardButton, 1, Config.HARD_ATTACK_MODE);//, 1, "easy");
@@ -136,6 +140,18 @@ var ShowLayer = cc.Layer.extend({
     attackFinished: function() {
         this.attackProgress.y = this.attackButton.y + Config.ATTACK_PROGRESS_Y;
     },
+    enemyEasyBegin: function() {
+        this.attackStatus.setTexture(res.easyAttack);
+        this.attackStatus.scaleX = 0.5;
+    },
+    enemyEasyReady: function() {
+        this.attackStatus.setTexture(res.easyGo);
+        this.attackStatus.scaleX = 0.5;
+    },
+    enemyEasyEnd: function() {
+        this.attackStatus.setTexture(res.attack);
+        this.attackStatus.scaleX = 1;
+    },
     /**
      * @param {string} FLAG
      * if FLAG is null, that means the attack action is truly ended.
@@ -174,6 +190,7 @@ var ShowLayer = cc.Layer.extend({
     },
     noAttack: function() {
         this.attackButton.setTexture(res.noAttack);
+        this.attackEnded();
     },
     doAttack: function() {
         this.attackButton.setTexture(res.attack);
@@ -186,9 +203,12 @@ var ShowLayer = cc.Layer.extend({
      */
     noPosition: function() {
         this.positionButton.setTexture(res.noPosition);
+        this.adjustPositionEnded();
+        this.setComponentEnbaled(Config.POSITION_BUTTON, false);
     },
     doPosition: function() {
         this.positionButton.setTexture(res.position);
+        this.setComponentEnbaled(Config.POSITION_BUTTON, true);
     },
     setPositionProgressDirection: function(FLAG, time) {
         var positionProgress = this.positionProgress;
@@ -224,6 +244,7 @@ var ShowLayer = cc.Layer.extend({
     },
     showFlashPosition: function(FLAG) {
         var img = this.moveButtons[FLAG];
+        console.log(img);
         if (img.getParent() == null) {
             this.addChild(img);
         }
@@ -285,6 +306,7 @@ var ShowLayer = cc.Layer.extend({
     noDefence: function() {
         this.defenceButton.setTexture(res.noDefence);
         this.defenceProgress.setVisible(false);
+        //this.defenceAction(Config.events.DEFENCE_END, Date.now());
         this.blockEnd();
     },
     doDefence: function() {
@@ -330,29 +352,53 @@ var ShowLayer = cc.Layer.extend({
      * update function is used to listen the frame event, and no-stop action, like energy bar move up and down
      */
 
-    setEnergyIndex: function(index) {
-        this.energyIndex = index;
+    setEnergyIndex: function(FLAG, index) {
+        this[FLAG + "EnergyIndex"] = index;
+        //this.playerEnergyIndex = index;
     },
     moveEnergyBar: function(variation, FLAG) {
+        var fighter = this._getFighter(FLAG);
+        var index = this[fighter + "EnergyIndex"];
         var bar = this.energyBars[FLAG];
         var yLimit = bar.getParent().getStencil().y - Config.MOVE_BUTTON_Y * 2;
         var height = bar.y + variation;
-        var lastIndex = (this.energyIndex - 1 + Config.ENERGY_LENGTH) % Config.ENERGY_LENGTH;
+        var lastIndex = (index - 1 + Config.ENERGY_LENGTH) % Config.ENERGY_LENGTH;
         bar.y = height;
         if (height < yLimit) {
-            this.eventCenter.dispatchEvent(Config.events.ENERGY_DURATION_BEGIN, {role: Config.PLAYER, lastIndex: lastIndex, index: this.energyIndex, time: Date.now()})
+            this.eventCenter.dispatchEvent(Config.events.ENERGY_DURATION_BEGIN, {role: fighter, lastIndex: lastIndex, index: index, time: Date.now()})
         }
     },
     nextEnergyRotation: function(index, FLAG) {
+        var fighter = this._getFighter(FLAG);
         var bar = this.energyBars[FLAG];
         var dot = this.energyDots[FLAG];
         bar.setTexture(res["Bar" + index]);
-        bar.y = Config.CENTER_Y + Config.ENERGY_Y;
+        if (FLAG == Config.ENEMY.category) {
+            bar.y = Config.CENTER_Y + Config.ENERGY_ENEMY_Y;
+        } else {
+            bar.y = Config.CENTER_Y + Config.ENERGY_Y;
+        }
         dot.setTexture(res["Dot" + index]);
-        this.energyIndex = index;
+        this[fighter + "EnergyIndex"] = index;
+    },
+    _getFighter: function(FLAG) {
+        switch(FLAG) {
+            case Config.RIGHT_SERIES: {
+                return Config.PLAYER;
+            }
+            case Config.LEFT_SERIES: {
+                return Config.PLAYER;
+            }
+            case Config.ENEMY.category: {
+                return FLAG;
+            }
+        }
+
     },
     energyRotation: function() {
-        this.eventCenter.dispatchEvent(Config.events.PLAYER_ENERGY_ROTATION, {role: Config.PLAYER, index: this.energyIndex, time: Date.now()});
+        //this.eventCenter.dispatchEvent(Config.events.PLAYER_ENERGY_ROTATION, {role: Config.PLAYER, index: this.playerEnergyIndex, time: Date.now()});
+        this.eventCenter.dispatchEvent(Config.events.ENERGY_ROTATION_GO, {role: Config.PLAYER, index: this.playerEnergyIndex, time: Date.now()});
+        this.eventCenter.dispatchEvent(Config.events.ENERGY_ROTATION_GO, {role: Config.ENEMY.category, index: this.enemyEnergyIndex, time: Date.now()});
     },
     optimizedSchedule: function(callback, interval) {
         var then = Date.now();
@@ -372,22 +418,33 @@ var ShowLayer = cc.Layer.extend({
     onEnter: function() {
         this._super();
         this.eventCenter = this.getParent().eventCenter;
+        console.log(this.positionButton);
         this.scheduleOnce(function() {
-            this.eventCenter.dispatchEvent(Config.events.SET_ENERGY_ROTATION_BEGIN_TIME, {role: Config.PLAYER, index: this.energyIndex, time: Date.now()});
+            this.eventCenter.dispatchEvent(Config.events.INIT_SHOW_LAYER, {time: Date.now()});
         }.bind(this));
-        this.optimizedSchedule(this.energyRotation, Config.duration.FRAME_TIME / 1000);
     },
     /**
      * status action function
      */
     setPositionLabel: function(label) {
-        console.log(label);
+        this.positionStatus.setTexture(res[label]);
     },
     enemyNoActionGo: function() {
-
+        this.actionStatus.setTexture(res.noActionGo);
+        this.enemyEasyEnd();
+        this.attackStatus.setTexture(res.noAttack);
+        this.defenceStatus.setTexture(res.noDefence);
     },
     enemyNoActionStop: function() {
-
+        this.actionStatus.setTexture(res.noActionStop);
+        this.attackStatus.setTexture(res.attack);
+        this.defenceStatus.setTexture(res.defence);
+    },
+    setComponentEnbaled: function(target, enable) {
+        this[target].enable = enable;
+    },
+    getComponentEnabled: function(target) {
+        return this[target].enable;
     },
 
     /**
@@ -402,8 +459,11 @@ var ShowLayer = cc.Layer.extend({
         this.addChild(bg);
 
         var position = new cc.Sprite(res.position);
-        position.x = Config.CENTER_X;
-        position.y = Config.CENTER_Y + Config.POSITION_Y;
+        position.attr({
+            x : Config.CENTER_X,
+            y : Config.CENTER_Y + Config.POSITION_Y,
+            enable: true
+        });
         this.addChild(position, 1);
 
         var slideLeft = new cc.Sprite(res.slide);
@@ -446,7 +506,7 @@ var ShowLayer = cc.Layer.extend({
         hardAttack.y = Config.CENTER_Y + Config.HARD_Y;
         hardAttack.setName(Config.HARD_ATTACK_MODE);
 
-        var energyLeftBar = new cc.Sprite(res["Bar" + this.energyIndex]);
+        var energyLeftBar = new cc.Sprite(res["Bar" + this.playerEnergyIndex]);
         energyLeftBar.x = Config.CENTER_X + Config.ENERGY_L_X;
         energyLeftBar.y = Config.CENTER_Y + Config.ENERGY_Y;
         var energyLeftStencil = new cc.Sprite(res.Bar0);
@@ -456,7 +516,7 @@ var ShowLayer = cc.Layer.extend({
         energyLeftMask.addChild(energyLeftBar);
         this.addChild(energyLeftMask);
 
-        var energyRightBar = new cc.Sprite(res["Bar" + this.energyIndex]);
+        var energyRightBar = new cc.Sprite(res["Bar" + this.playerEnergyIndex]);
         energyRightBar.x = Config.CENTER_X + Config.ENERGY_R_X;
         energyRightBar.y = Config.CENTER_Y + Config.ENERGY_Y;
         var energyRightStencil = new cc.Sprite(res.Bar0);
@@ -466,12 +526,12 @@ var ShowLayer = cc.Layer.extend({
         energyRightMask.addChild(energyRightBar);
         this.addChild(energyRightMask);
 
-        var energyLeftDot = new cc.Sprite(res["Dot" + this.energyIndex]);
+        var energyLeftDot = new cc.Sprite(res["Dot" + this.playerEnergyIndex]);
         energyLeftDot.x = Config.CENTER_X + Config.ENERGY_L_X;
         energyLeftDot.y = Config.CENTER_Y + Config.DOT_Y;
         this.addChild(energyLeftDot);
 
-        var energyRightDot = new cc.Sprite(res["Dot" + this.energyIndex]);
+        var energyRightDot = new cc.Sprite(res["Dot" + this.playerEnergyIndex]);
         energyRightDot.x = Config.CENTER_X + Config.ENERGY_R_X;
         energyRightDot.y = Config.CENTER_Y + Config.DOT_Y;
         this.addChild(energyRightDot);
@@ -526,17 +586,17 @@ var ShowLayer = cc.Layer.extend({
         statusEnemy.y = Config.CENTER_Y + Config.STATUS_ENEMY_Y;
         this.addChild(statusEnemy);
 
-        var faceEnemy = new cc.Sprite(res.face);
+        var faceEnemy = new cc.Sprite(res.enemyFacedToMe);
         faceEnemy.x = Config.CENTER_X + Config.FACE_X;
         faceEnemy.y = Config.CENTER_Y + Config.FACE_Y;
         this.addChild(faceEnemy);
 
-        var energyEnemyDot = new cc.Sprite(res.Dot2);
+        var energyEnemyDot = new cc.Sprite(res["Dot" + this.playerEnergyIndex]);
         energyEnemyDot.x = Config.CENTER_X + Config.DOT_ENEMY_X;
         energyEnemyDot.y = Config.CENTER_Y + Config.DOT_ENEMY_Y;
         this.addChild(energyEnemyDot);
 
-        var energyEnemyBar = new cc.Sprite(res.Bar2);
+        var energyEnemyBar = new cc.Sprite(res["Bar" + this.playerEnergyIndex]);
         energyEnemyBar.x = Config.CENTER_X + Config.ENERGY_ENEMY_X;
         energyEnemyBar.y = Config.CENTER_Y + Config.ENERGY_ENEMY_Y;
         var energyEnemyStencil = new cc.Sprite(res.Bar2);

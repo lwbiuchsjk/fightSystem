@@ -108,8 +108,10 @@ var Config = {
 	ENERGY_QUANTITY: "energyQuantity",
 
 	CHARACTER_STATUS: "status",
-	CHARACTER_ENERGY: "energy",
+	OPERATE_ENERGY: "operateEnergy",
 	ENERGY_INDEX: "ENERGY_INDEX",
+
+	POSITION_BUTTON: "positionButton",
 
 	/**
 	 * the configs below is about the function name with events
@@ -147,9 +149,10 @@ var Config = {
 		OPERATE_ENERGY_BEGIN: "operateEnergyBegin",
 		OPERATE_ENERGY_END: "operateEnergyEnd",
 		ENERGY_DURATION_BEGIN: "energyDurationBegin",
-		SET_ENERGY_ROTATION_BEGIN_TIME: "setEnergyRotationBeginTime",
-		PLAYER_ENERGY_ROTATION: "playerEnergyRotation",
-		ENEMY_ENERGY_ROTATION: "enemyEnergyRotation",
+		INIT_SHOW_LAYER: "initShowLayer",
+		//PLAYER_ENERGY_ROTATION: "playerEnergyRotation",
+		//ENEMY_ENERGY_ROTATION: "enemyEnergyRotation",
+		ENERGY_ROTATION_GO: "energyRotationGo",
 
 		NO_ACTION_GO: "noActionGo",
 		NO_ACTION_STOP: "noActionStop",
@@ -183,9 +186,9 @@ var Config = {
 	/**
 	 * status
 	 */
-	ENEMY_FACED_TO_ME: "ENEMY_FACED_TO_ME",
-	ENEMY_BROADSIDE_ON_ME: "ENEMY_BROADSIDE_ON_ME",
-	BROADSIDE_ON_ENEMY: "BROADSIDE_ON_ENEMY",
+	enemyFacedToMe: "enemyFacedToMe",
+	enemyBroadsideOnMe: "enemyBroadsideOnMe",
+	broadsideOnEnemy: "broadsideOnEnemy",
 
 	/**
 	 * characters
@@ -211,7 +214,7 @@ var Config = {
 		defenceAction: {
 			getWounded: -1,
 		},
-		ENEMY_BROADSIDE_ON_ME: {
+		enemyBroadsideOnMe: {
 			getWounded: 1,
 			noAction: 250,
 		},

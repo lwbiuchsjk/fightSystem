@@ -23,7 +23,6 @@ var FightScene = cc.Scene.extend({
 	_setEventCenter: function(flowControlLayer) {
 		this.eventCenter = new CustomEventCenter();
 
-
 		var events = Config.events;
 		for(var i in events) {
 			this.eventCenter.addListener(events[i], flowControlLayer[events[i]].bind(flowControlLayer));

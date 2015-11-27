@@ -3,16 +3,20 @@
  */
 var StatusCalculateLayer = cc.Layer.extend({
 	showLayer: null,
+	characterFactory: null,
 
 	ctor: function() {
 		this._super();
 		this.init();
 		this.setName(Config.STATUS_CALCULATE_LAYER);
+		this.characterFactory = new CharacterFactory();
 
-		var player = new CharacterStatus();
+		var player = new Fighter();
 		player.setName(Config.PLAYER);
+		this.characterFactory.loadCharacter(player.data, player.getName());
 		this.addChild(player);
 		this._initEnemies();
+		//this.addChild(new test());  //DEBUG
 	},
 
 	getCharacter: function(character) {
@@ -20,8 +24,9 @@ var StatusCalculateLayer = cc.Layer.extend({
 	},
 
 	_initEnemies: function() {
-		var enemy = new CharacterStatus();
+		var enemy = new Fighter();
 		enemy.setName(Config.ENEMY.category);
+		this.characterFactory.loadCharacter(enemy.data, enemy.getName());
 		this.addChild(enemy);
 	},
 
@@ -35,112 +40,54 @@ var StatusCalculateLayer = cc.Layer.extend({
 
 		var player = this.getChildByName(Config.PLAYER);
 		var enemy = this.getChildByName(Config.ENEMY.category);
-		player.setEnemy(enemy, Config.ENEMY_FACED_TO_ME);
+		player.setEnemy(enemy, Config.enemyBroadsideOnMe);
 		player.setTarget(enemy);
-		enemy.setEnemy(player, Config.ENEMY_FACED_TO_ME);
+		enemy.setEnemy(player, Config.broadsideOnEnemy);
+		enemy.setTarget(player);
+		var enemyMind = new EnemyAi(enemy, 1, this.getParent().eventCenter);
+		this.addChild(enemyMind);
 	}
 });
 
-var CharacterStatus = cc.Node.extend({
+var Fighter = cc.Node.extend({
 
 	showLayer: null,
 	eventCenter: null,
+
+	// data is used to load the basic character data from character factory. and then the thins below will read data to themselves when used in the calculation
+	data: null,
 
 	easyAttack: null,
 	hardAttack: null,
 	adjustPosition: null,
 	defenceAction: null,
-	energy: null,
+	singleEnergy: null,
+	operateEnergy: null,
 	status: null,
 	enemies: null,
 	action: null,
+	attackEffect: null,
 
 	ctor: function() {
 		this._super();
+
+		this.data = {};
 		console.info("STATUS OK!!!");
-
-		this.easyAttack = new Array(3);
-		this.easyAttack[Config.events.EASY_BEGIN] = 0;
-		this.easyAttack[Config.events.EASY_READY] = 0;
-		this.easyAttack[Config.events.EASY_GO] = 0;
-
-		this.hardAttack = new Array(3);
-		this.hardAttack[Config.events.HARD_BEGIN] = null;
-		this.hardAttack[Config.events.HARD_READY] = null;
-		this.hardAttack[Config.events.HARD_GO] = null;
-
-		this.adjustPosition = new Array(9);
-		this.adjustPosition[Config.events.MOVE_ASIDE_BEGIN] = null;
-		this.adjustPosition[Config.events.MOVE_FORWARD_BEGIN] = null;
-		this.adjustPosition[Config.events.MOVE_BACKWARD_BEGIN] = null;
-		this.adjustPosition[Config.events.MOVE_ASIDE_END] = null;
-		this.adjustPosition[Config.events.MOVE_FORWARD_END] = null;
-		this.adjustPosition[Config.events.MOVE_BACKWARD_END] = null;
-		this.adjustPosition[Config.events.POSITION_BEGIN] = null;
-		this.adjustPosition[Config.events.POSITION_END] = null;
-		this.adjustPosition[Config.events.OPERATE_ADJUST] = null;
-
-		this.defenceAction = new Array(5);
-		this.defenceAction[Config.events.DEFENCE_BEGIN] = null;
-		this.defenceAction[Config.events.DEFENCE_END] = null;
-		this.defenceAction[Config.events.BLOCK_BEGIN] = null;
-		this.defenceAction[Config.events.BLOCK_FAIL] = null;
-		this.defenceAction[Config.events.BLOCK_GO] = null;
-
-		this.energy = new Array(7);
-		for (var i = 0; i < Config.ENERGY_LENGTH; i++) {
-			//init energy. should be replaced
-			this.energy[i] = {};
-			this.energy[i][Config.events.ENERGY_DURATION_BEGIN] = 0;
-			this.energy[i][Config.ENERGY_QUANTITY] = 48;
-			this.energy[i].energyDuration = Config.duration.ENERGY[i];
-		}
-		this.energy[Config.events.OPERATE_ENERGY_BEGIN] = 0;
-		this.energy[Config.events.OPERATE_ENERGY_END] = 0;
-
-		this.status = {};
-		this.status.energyIndex = 0;
-		this.status.getWounded = 1;
-		this.status.ATTACK_ENERGY = this.status.energyIndex;
-		this.status.target = {};
-		this.status.noAction = 0;
-		this.status.adjustPositionWindow = 0;
-		this.status.enemyMoving = null;
-		this.status.frameTime = Config.duration.FRAME_TIME / 1000;
-
-		this.action = {};
-		this.action.blockPunishment = 250;
-		this.action.blockBonus = 250;
-		this.action.easyTime = Config.duration.EASY_BUTTON / 1000;
-		this.action.hardTime = Config.duration.HARD_BUTTON / 1000;
-		this.action.hitTime = Config.duration.HIT_TIME / 1000;
-		this.action.adjustTime = Config.duration.ADJUST_POSITION_BUTTON / 1000;
-		this.action.maxDefenceTime = Config.duration.DEFENCE_MAX_TIME / 1000;
-		this.action.blockWindow = Config.duration.BLOCK_WINDOW / 1000;
-		this.action.maxNoActionTime = Config.duration.MAX_NO_ACTON_TIME;
-		this.action.adjustWindow = Config.duration.ADJUST_POSITION_WINDOW / 1000;
-		this.action.directionTime = Config.duration.ADJUST_POSITION_BUTTON / 1000;
-		this.action.defenceDuration = Config.duration.DEFENCE_MAX_TIME / 1000;
-		this.action.movingEvent = {
-			me: {
-				begin: null,
-				end: null
-			},
-			enemy: {
-				begin: null,
-				end: null
-			}
-		};
-
-		this.enemies = {
-			ENEMY_FACED_TO_ME: null,
-			ENEMY_BROADSIDE_ON_ME: null,
-			BROADSIDE_ON_ENEMY: null,
-		};
-
 	},
 	onEnter: function() {
 		this._super();
+
+
+		this.easyAttack = this.data.easyAttack;
+		this.hardAttack = this.data.hardAttack;
+		this.adjustPosition = this.data.adjustPosition;
+		this.defenceAction = this.data.defenceAction;
+		this.singleEnergy = this.data.singleEnergy;
+		this.operateEnergy = this.data.operateEnergy;
+		this.status = this.data.status;
+		this.enemies = this.data.enemies;
+		this.action = this.data.action;
+		this.attackEffect = this.data.attackEffect;
 
 		this.showLayer = this.getParent().getParent().getChildByName(Config.SHOW_LAYER);
 		this.eventCenter = this.getParent().getParent().eventCenter;
@@ -177,33 +124,36 @@ var CharacterStatus = cc.Node.extend({
 	getHitTime: function() {
 		return this.action.hitTime;
 	},
+	getAttackEffect: function(kind) {
+		return this.attackEffect[kind];
+	},
 	setAttackEnergy: function(index) {
 		if (0 < index && index < Config.ENERGY_LENGTH) {
-			this.status.ATTACK_ENERGY = index;
+			this.status.attackEnergyIndex = index;
 		}
 	},
 	getAttackEnergy: function() {
-	 	return this.status.ATTACK_ENERGY;
+	 	return this.status.attackEnergyIndex;
 	},
-	checkWound: function(index, kind, positionCondition, defenceCondition) {
-		var wound = Config[kind].getWounded;
-		var noAction = Config[kind].noAction;
+	checkWound: function(index, sourceEffect, positionCondition, defenceCondition) {
+		var wound = sourceEffect.getWounded;
+		var noAction = sourceEffect.noAction;
 		var myIndex = this.getEnergyIndex();
 		if (this.isAttacked()) {
 			if (positionCondition) {
 				if (defenceCondition) {
-					wound += Config.ATTACK_EFFECT.defenceAction.getWounded;
+					wound += this.attackEffect.defenceAction.getWounded;
 				} else {
 				}
 			} else {
-				wound += Config.ATTACK_EFFECT.ENEMY_BROADSIDE_ON_ME.getWounded;
-				noAction += Config.ATTACK_EFFECT.ENEMY_BROADSIDE_ON_ME.noAction;
+				wound += this.attackEffect.enemyBroadsideOnMe.getWounded;
+				noAction += this.attackEffect.enemyBroadsideOnMe.noAction;
 			}
 			if (this.getMightyEnergy(index) == myIndex) {
-				wound += Config.ATTACK_EFFECT.ENERGY_MIGHTY.getWounded;
+				wound += this.attackEffect.energyMight.getWounded;
 			}
 			if (this.getWeakEnergy(index)  == myIndex) {
-				wound += Config.ATTACK_EFFECT.ENERGY_WEAK.getWounded;
+				wound += this.attackEffect.energyWeak.getWounded;
 			}
 			var energy = this.getEnergy(myIndex) - wound;
 			this.setEnergy(myIndex, energy);
@@ -235,7 +185,7 @@ var CharacterStatus = cc.Node.extend({
 	},
 	setAdjustWindow: function() {
 		this.status.adjustPositionWindow = this.action.adjustWindow;
-		console.info("ADJUST GO!!!");
+		console.info(this.getName() + " ADJUST GO!!!");
 	},
 	isInAdjustWindow: function() {
 		return this.status.adjustPositionWindow <= 0;
@@ -275,7 +225,7 @@ var CharacterStatus = cc.Node.extend({
 		switch (FLAG) {
 			case Config.events.DEFENCE_BEGIN: {
 				if (beginTime != null && endTime != null) {
-					this.action.defenceDuration = Math.min(beginTime - endTime + this.getDefenceDuration(), this.action.maxDefenceTime * 1000);
+					this.action.defenceDuration = Math.min(beginTime - endTime + this.getDefenceDuration(), this.action.maxDefenceTime);
 				}
 				break;
 			}
@@ -334,28 +284,28 @@ var CharacterStatus = cc.Node.extend({
 		return this.status.energyIndex;
 	},
 	isOperateEnergyBegan: function() {
-		return (this.energy[Config.events.OPERATE_ENERGY_BEGIN] > this.energy[Config.events.OPERATE_ENERGY_END]);
+		return (this.operateEnergy[Config.events.OPERATE_ENERGY_BEGIN] > this.operateEnergy[Config.events.OPERATE_ENERGY_END]);
 	},
 	isOperateEnergyEnded: function() {
-		return (this.energy[Config.events.OPERATE_ENERGY_END] > this.energy[Config.events.OPERATE_ENERGY_BEGIN]);
+		return (this.operateEnergy[Config.events.OPERATE_ENERGY_END] > this.operateEnergy[Config.events.OPERATE_ENERGY_BEGIN]);
 	},
 	getEnergyOperationBegin: function() {
-		return this.energy[Config.events.OPERATE_ENERGY_BEGIN];
+		return this.operateEnergy[Config.events.OPERATE_ENERGY_BEGIN];
 	},
 	getEnergyOperationEnd: function() {
-		return this.energy[Config.events.OPERATE_ENERGY_END];
+		return this.operateEnergy[Config.events.OPERATE_ENERGY_END];
 	},
 	setEnergyBeginTime: function(index, time) {
-		this.energy[index][Config.events.ENERGY_DURATION_BEGIN] = time;
+		this.singleEnergy[index][Config.events.ENERGY_DURATION_BEGIN] = time;
 	},
 	duration2Height: function(index) {
-		return Config.MOVE_BUTTON_Y * 2 / (Config.duration.ENERGY[index] / this.status.frameTime / 1000);
+		return Config.MOVE_BUTTON_Y * 2 / (this.getEnergyDuration(index) / this.status.frameTime / 1000);
 	},
 	getEnergyDuration: function(index) {
-		return Config.duration.ENERGY[index];
+		return this.singleEnergy[index].energyDuration;
 	},
 	getEnergyBeginTime: function(index) {
-		return this.energy[index][Config.events.ENERGY_DURATION_BEGIN];
+		return this.singleEnergy[index][Config.events.ENERGY_DURATION_BEGIN];
 	},
 	isOneDuration: function(lastIndex, thisIndex) {
 		var thisBegin = this.getEnergyBeginTime(thisIndex);
@@ -368,16 +318,16 @@ var CharacterStatus = cc.Node.extend({
 		return condition;
 	},
 	getMightyEnergy: function(index) {
-		return Config.ENERGY_MIGHTY[index];
+		return (index + 2) % 5;//Config.ENERGY_MIGHTY[index];
 	},
 	getWeakEnergy: function(index) {
-		return Config.ENERGY_WEAK[index];
+		return (index + 1) % 5;//Config.ENERGY_WEAK[index];
 	},
 	setEnergy: function(index, energy) {
-		this.energy[index][Config.ENERGY_QUANTITY] = energy;
+		this.singleEnergy[index].energyQuantity = energy;
 	},
 	getEnergy: function(index) {
-		return this.energy[index][Config.ENERGY_QUANTITY];
+		return this.singleEnergy[index].energyQuantity;
 	},
 	
 	/**
@@ -435,7 +385,14 @@ var CharacterStatus = cc.Node.extend({
 		this.eventCenter.dispatchEvent(Config.events.NO_ACTION_GO, noActionEvent);
 	},
 	getNoActionTime: function() {
+		// if noAction <= 0, that means someone can do actions.
 		return this.status.noAction;
+	},
+	setNoActionFlag: function(value) {
+		this.status.noActionFlag = value;
+	},
+	isNoActionFlag: function() {
+		return this.status.noActionFlag;
 	},
 	/**
 	 * @param {Number} value
@@ -452,13 +409,13 @@ var CharacterStatus = cc.Node.extend({
 		if (event.me.begin == null || event.enemy.begin == null || event.me.begin < value.me.begin || event.enemy.begin < value.enemy.begin) {
 			this.action.movingEvent = value;
 			if ((value.me.end != null && value.enemy.end == null) || (value.me.end != null && value.enemy.end != null && value.me.end < value.enemy.end)) {
-				this.enemies.BROADSIDE_ON_ENEMY = this.getTarget();
-				this.enemies.ENEMY_FACED_TO_ME = null;
+				this.enemies.broadsideOnEnemy = this.getTarget();
+				this.enemies.enemyFacedToMe = null;
 				console.log("%s: MOVE TO ENEMY ASIDE!!!", this.getName());
 			} else
 			if ((value.enemy.end != null && value.me.end == null) || (value.me.end != null && value.enemy.end != null && value.enemy.end < value.me.end)) {
-				this.enemies.ENEMY_BROADSIDE_ON_ME = this.getTarget();
-				this.enemies.ENEMY_FACED_TO_ME = null;
+				this.enemies.enemyBroadsideOnMe = this.getTarget();
+				this.enemies.enemyFacedToMe = null;
 				console.log("%s: ENEMY MOVES TO OUR ASIDE!!!", this.getName());
 			} else {
 				console.error("MOVING ERROR!!!");
@@ -478,7 +435,7 @@ var CharacterStatus = cc.Node.extend({
 	 * the function use FLAG to distinguish the callee function. the FLAG is the Config events String.
 	 */
 	checkPosition: function(FLAG) {
-		if (this.isEnemyPosition(Config.ENEMY_FACED_TO_ME) && FLAG == Config.events.MOVE_ASIDE_END) {
+		if (this.isEnemyPosition(Config.enemyFacedToMe) && FLAG == Config.events.MOVE_ASIDE_END) {
 			var meAsideBegin = this.adjustPosition[Config.events.MOVE_ASIDE_BEGIN];
 			var meAsideEnd = this.adjustPosition[Config.events.MOVE_ASIDE_END];
 			var moving = this.getEnemyMoving();
@@ -503,13 +460,13 @@ var CharacterStatus = cc.Node.extend({
 				this.getTarget().setMovingEvent(dispatchConclusion);
 			}
 		} else
-		if ((this.isEnemyPosition(Config.ENEMY_BROADSIDE_ON_ME) || this.isEnemyPosition(Config.BROADSIDE_ON_ENEMY)) && FLAG == Config.events.ADJUST_TO_FACE ) {
-			this.setEnemy(this.getTarget(), Config.ENEMY_FACED_TO_ME);
-			this.getTarget().setEnemy(this, Config.ENEMY_FACED_TO_ME);
+		if ((this.isEnemyPosition(Config.enemyBroadsideOnMe) || this.isEnemyPosition(Config.broadsideOnEnemy)) && FLAG == Config.events.ADJUST_TO_FACE ) {
+			this.setEnemy(this.getTarget(), Config.enemyFacedToMe);
+			this.getTarget().setEnemy(this, Config.enemyFacedToMe);
 			console.log("ENEMY FACED TO ME!!!");
 		}
 		this.cleanMoveDirection();
-		this.eventCenter.dispatchEvent(Config.events.SET_POSITION_LABEL);
+		this.eventCenter.dispatchEvent(Config.events.SET_POSITION_LABEL, this.getName());
 	},
 	checkStatus: function() {
 		if (this.status.noAction > 0) {
