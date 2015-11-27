@@ -1,6 +1,7 @@
 
 var ShowLayer = cc.Layer.extend({
 
+    eventCenter: null,
     //player click to attack
     attackButton: null,
     //player click to defence
@@ -16,13 +17,9 @@ var ShowLayer = cc.Layer.extend({
     //player click to make movement action from position button
     moveButtons: new Array(4),
     //player click to adjust energy status
-    energyButtons: [],
+    energyDots: new Array(3),
     //show player`s energy status
-    energyBars: [],
-    //energy quantity of player
-    energyLabelsMe: new Array(5),
-    //energy quantity of enemy
-    energyLabelsEnemy: new Array(5),
+    energyBars: new Array(3),
 
     //show the attack progress bar
     attackProgress: null,
@@ -30,6 +27,7 @@ var ShowLayer = cc.Layer.extend({
     defenceProgress: null,
     //show the button which like player`s position action progress bar
     positionProgress: null,
+    positionMask: null,
     //the attack status of enemy
     attackStatus: null,
     //the defence status of enemy
@@ -38,10 +36,6 @@ var ShowLayer = cc.Layer.extend({
     positionStatus: null,
     //the noAction status of enemy
     actionStatus: null,
-    //the energy dot of enemy
-    energyDotEnemy: null,
-    //the energy progress bar of enemy
-    energyBarEnemy: null,
 
     attackEasyUp: null,
     attackHardUp: null,
@@ -51,17 +45,27 @@ var ShowLayer = cc.Layer.extend({
     defenceProgressIn: null,
 
     sysControlLayer: null,
+    playerEnergyIndex: null,
+    enemyEnergyIndex: null,
+
+    noActionPlayer: null,
+    noActionEnemy: null,
+
+    Energy: {
+        player: new Array(5),
+        enemy: new Array(5),
+    },
+
+    frameTime: null,
 
     ctor:function () {
         this._super();
-
         this.setName(Config.SHOW_LAYER);
+
+        this.playerEnergyIndex = 0;
         this._setElements();
-        this._setAction();
 
         console.log("show layer OK!!!");
-
-        return true;
     },
 
     /**
@@ -69,12 +73,41 @@ var ShowLayer = cc.Layer.extend({
      * below is the attack action series
      *
      */
+    initAttackMovement: function(easyTime, hardTime) {
+        if (this.attackEasyUp == null) {
+            this.attackEasyUp = cc.sequence(
+                cc.moveTo(easyTime, cc.p(this.attackButton.x + Config.ATTACK_PROGRESS_X, this.attackButton.y + Config.ATTACK_PROGRESS_Y + 300)),
+                cc.callFunc(function() {
+                    this.eventCenter.dispatchEvent(Config.events.EASY_READY, {role: Config.PLAYER, time: Date.now()});
+                }.bind(this), this)
+            );
+        }
+        if (this.attackHardUp == null) {
+            this.attackHardUp = cc.sequence(
+                cc.moveTo(hardTime, cc.p(this.attackButton.x + Config.ATTACK_PROGRESS_X, this.attackButton.y + Config.ATTACK_PROGRESS_Y + 300)),
+                cc.callFunc(function() {
+                    this.eventCenter.dispatchEvent(Config.events.HARD_READY, {role: Config.PLAYER, time: Date.now()});
+                }.bind(this), this)
+            );
+        }
+    },
+    attackBegan: function() {
+        if (!this.easyButton.getParent() && !this.hardButton.getParent()) {
+            this.addChild(this.easyButton, 1, Config.EASY_ATTACK_MODE);//, 1, "easy");
+            this.addChild(this.hardButton, 1, Config.HARD_ATTACK_MODE);//, 1, "easy");
+        }
+    },
     easyAttackReady: function() {
         this.easyButton.setTexture(res.easyGo);
     },
     easyAttackBegin: function() {
         this.easyButton.setTexture(res.easyAttack);
         this.hardButton.setTexture(res.hardNo);
+        var attackProgress = this.attackProgress;
+        var upAction = this.attackEasyUp;
+        if (upAction.getTarget() == null) {
+            attackProgress.runAction(upAction);
+        }
     },
     hardAttackReady: function() {
         this.hardButton.setTexture(res.hardGo);
@@ -82,9 +115,42 @@ var ShowLayer = cc.Layer.extend({
     hardAttackBegin: function() {
         this.hardButton.setTexture(res.hardAttack);
         this.easyButton.setTexture(res.easyNo);
+        var attackProgress = this.attackProgress;
+        var upAction = this.attackHardUp;
+        if (upAction.getTarget() == null) {
+            attackProgress.runAction(upAction);
+        }
+    },
+    attackFlashReady: function(FLAG) {
+        switch(FLAG) {
+            case Config.EASY_ATTACK_MODE: {
+                this.easyAttackReady();
+                this.hardButton.setTexture(res.hardNo);
+                break;
+            }
+            case Config.HARD_ATTACK_MODE: {
+                this.hardAttackReady();
+                this.easyButton.setTexture(res.easyNo);
+                break;
+            }
+        }
+        this.attackProgressActionStopped();
+        this.attackProgress.y = this.attackButton.y + Config.ATTACK_PROGRESS_Y + 300;
     },
     attackFinished: function() {
         this.attackProgress.y = this.attackButton.y + Config.ATTACK_PROGRESS_Y;
+    },
+    enemyEasyBegin: function() {
+        this.attackStatus.setTexture(res.easyAttack);
+        this.attackStatus.scaleX = 0.5;
+    },
+    enemyEasyReady: function() {
+        this.attackStatus.setTexture(res.easyGo);
+        this.attackStatus.scaleX = 0.5;
+    },
+    enemyEasyEnd: function() {
+        this.attackStatus.setTexture(res.attack);
+        this.attackStatus.scaleX = 1;
     },
     /**
      * @param {string} FLAG
@@ -110,6 +176,10 @@ var ShowLayer = cc.Layer.extend({
             this.easyButton.removeFromParent();
             this.hardButton.removeFromParent();
         }
+        this.attackProgressActionStopped();
+        this.attackFinished();
+    },
+    attackProgressActionStopped: function() {
         if (this.attackEasyUp.getTarget() != null || this.attackHardUp.getTarget() != null) {
             //this.attackProgress.stopAction(this.attackEasyUp);
             this.attackProgress.stopAllActions();
@@ -117,10 +187,13 @@ var ShowLayer = cc.Layer.extend({
             this.attackHardUp.setTarget(null);
             console.log("stop progress");
         }
-
-        this.attackFinished();
     },
-    adjustPositionFinished: function() {
+    noAttack: function() {
+        this.attackButton.setTexture(res.noAttack);
+        this.attackEnded();
+    },
+    doAttack: function() {
+        this.attackButton.setTexture(res.attack);
     },
 
     /**
@@ -128,15 +201,90 @@ var ShowLayer = cc.Layer.extend({
      * below is the position action series.
      *
      */
-    adjustPositionEnded: function(FLAG) {
+    noPosition: function() {
+        this.positionButton.setTexture(res.noPosition);
+        this.adjustPositionEnded();
+        this.setComponentEnbaled(Config.POSITION_BUTTON, false);
+    },
+    doPosition: function() {
+        this.positionButton.setTexture(res.position);
+        this.setComponentEnbaled(Config.POSITION_BUTTON, true);
+    },
+    setPositionProgressDirection: function(FLAG, time) {
+        var positionProgress = this.positionProgress;
+        var positionMovement = this.positionMovement;
+        this.positionMask.setInverted(true);
+        positionProgress.attr({
+            x: this.positionButton.x,
+            y: this.positionButton.y
+        });
+        var direction;
+        switch(FLAG) {
+            case Config.LEFT_SERIES: {
+                direction = cc.p(this.positionButton.x - Config.SLIDE_X, this.positionButton.y);
+                break;
+            }
+            case Config.RIGHT_SERIES: {
+                direction = cc.p(this.positionButton.x + Config.SLIDE_X, this.positionButton.y);
+                break;
+            }
+            case Config.MOVE_FORWARD: {
+                direction = cc.p(this.positionButton.x, this.positionButton.y + Config.MOVE_BUTTON_Y);
+                break;
+            }
+            case Config.MOVE_BACKWARD: {
+                direction = cc.p(this.positionButton.x, this.positionButton.y - Config.MOVE_BUTTON_Y);
+                break;
+            }
+        }
+        positionMovement = cc.moveTo(time, direction);
+        if (positionMovement.getTarget() == null) {
+            positionProgress.runAction(positionMovement);
+        }
+    },
+    showFlashPosition: function(FLAG) {
+        var img = this.moveButtons[FLAG];
+        console.log(img);
+        if (img.getParent() == null) {
+            this.addChild(img);
+        }
+        this.resetPositionProgress();
+    },
+    adjustPositionBegan: function(time) {
+        this.positionProgress.attr({
+            x: this.positionButton.x + Config.SLIDE_X,
+            y: this.positionButton.y
+        });
+        this.positionMovement = cc.sequence(
+            cc.moveTo(time, cc.p(this.positionButton.x, this.positionButton.y)),
+            cc.callFunc(function() {
+                for(var i in this.moveButtons) {
+                    var e = this.moveButtons[i];
+                    if (!e.getParent()) {
+                        this.addChild(e, 1);
+                    }
+                }
+                this.positionMovement.setTarget(null);
+            }.bind(this), this));
         var positionMovement = this.positionMovement;
         var positionProgress = this.positionProgress;
+        if (positionMovement.getTarget() == null) {
+            positionProgress.runAction(positionMovement);
+        }
+    },
+    resetPositionProgress: function() {
+        var positionMovement = this.positionMovement;
+        var positionProgress = this.positionProgress;
+        if (positionMovement.getTarget() != null) { //!!! getTarget not getTarget()
+            positionProgress.stopAllActions();
+            positionMovement.setTarget(null);
+        }
+        positionProgress.x = this.positionButton.x + Config.SLIDE_X;
+    },
+    adjustPositionEnded: function(FLAG) {
         if (FLAG == null || FLAG == Config.WRONG_ACTION) {
-            if (positionMovement.getTarget() != null) { //!!! getTarget not getTarget()
-                positionProgress.stopAllActions();
-                positionMovement.setTarget(null);
-            }
-            positionProgress.x = this.positionButton.x + Config.SLIDE_X;
+            this.resetPositionProgress();
+            this.positionMask.setInverted(false);
         }
         if (FLAG != Config.WRONG_ACTION) {
             for (var i in this.moveButtons) {
@@ -155,6 +303,16 @@ var ShowLayer = cc.Layer.extend({
      * below is the defence action series.
      *
      */
+    noDefence: function() {
+        this.defenceButton.setTexture(res.noDefence);
+        this.defenceProgress.setVisible(false);
+        //this.defenceAction(Config.events.DEFENCE_END, Date.now());
+        this.blockEnd();
+    },
+    doDefence: function() {
+        this.defenceButton.setTexture(res.defence);
+        this.defenceProgress.setVisible(true);
+    },
     defenceAction: function(FLAG, time) {
         var progress = this.defenceProgress;
         var generateAction = function(stop, start) {
@@ -191,48 +349,109 @@ var ShowLayer = cc.Layer.extend({
     },
 
     /**
+     * update function is used to listen the frame event, and no-stop action, like energy bar move up and down
+     */
+
+    setEnergyIndex: function(FLAG, index) {
+        this[FLAG + "EnergyIndex"] = index;
+        //this.playerEnergyIndex = index;
+    },
+    moveEnergyBar: function(variation, FLAG) {
+        var fighter = this._getFighter(FLAG);
+        var index = this[fighter + "EnergyIndex"];
+        var bar = this.energyBars[FLAG];
+        var yLimit = bar.getParent().getStencil().y - Config.MOVE_BUTTON_Y * 2;
+        var height = bar.y + variation;
+        var lastIndex = (index - 1 + Config.ENERGY_LENGTH) % Config.ENERGY_LENGTH;
+        bar.y = height;
+        if (height < yLimit) {
+            this.eventCenter.dispatchEvent(Config.events.ENERGY_DURATION_BEGIN, {role: fighter, lastIndex: lastIndex, index: index, time: Date.now()})
+        }
+    },
+    nextEnergyRotation: function(index, FLAG) {
+        var fighter = this._getFighter(FLAG);
+        var bar = this.energyBars[FLAG];
+        var dot = this.energyDots[FLAG];
+        bar.setTexture(res["Bar" + index]);
+        if (FLAG == Config.ENEMY.category) {
+            bar.y = Config.CENTER_Y + Config.ENERGY_ENEMY_Y;
+        } else {
+            bar.y = Config.CENTER_Y + Config.ENERGY_Y;
+        }
+        dot.setTexture(res["Dot" + index]);
+        this[fighter + "EnergyIndex"] = index;
+    },
+    _getFighter: function(FLAG) {
+        switch(FLAG) {
+            case Config.RIGHT_SERIES: {
+                return Config.PLAYER;
+            }
+            case Config.LEFT_SERIES: {
+                return Config.PLAYER;
+            }
+            case Config.ENEMY.category: {
+                return FLAG;
+            }
+        }
+
+    },
+    energyRotation: function() {
+        //this.eventCenter.dispatchEvent(Config.events.PLAYER_ENERGY_ROTATION, {role: Config.PLAYER, index: this.playerEnergyIndex, time: Date.now()});
+        this.eventCenter.dispatchEvent(Config.events.ENERGY_ROTATION_GO, {role: Config.PLAYER, index: this.playerEnergyIndex, time: Date.now()});
+        this.eventCenter.dispatchEvent(Config.events.ENERGY_ROTATION_GO, {role: Config.ENEMY.category, index: this.enemyEnergyIndex, time: Date.now()});
+    },
+    optimizedSchedule: function(callback, interval) {
+        var then = Date.now();
+        interval = interval * 1000;
+        this.schedule(function() {
+            var now = Date.now();
+            var delta = now - then;
+            if(delta > interval) {
+                then = now - (delta % interval);
+                callback.call(this);
+            }
+        }.bind(this), 0);
+    },
+    setEnergyLabel: function(FLAG, index, energy) {
+        this.Energy[FLAG][index].setString(energy);
+    },
+    onEnter: function() {
+        this._super();
+        this.eventCenter = this.getParent().eventCenter;
+        console.log(this.positionButton);
+        this.scheduleOnce(function() {
+            this.eventCenter.dispatchEvent(Config.events.INIT_SHOW_LAYER, {time: Date.now()});
+        }.bind(this));
+    },
+    /**
+     * status action function
+     */
+    setPositionLabel: function(label) {
+        this.positionStatus.setTexture(res[label]);
+    },
+    enemyNoActionGo: function() {
+        this.actionStatus.setTexture(res.noActionGo);
+        this.enemyEasyEnd();
+        this.attackStatus.setTexture(res.noAttack);
+        this.defenceStatus.setTexture(res.noDefence);
+    },
+    enemyNoActionStop: function() {
+        this.actionStatus.setTexture(res.noActionStop);
+        this.attackStatus.setTexture(res.attack);
+        this.defenceStatus.setTexture(res.defence);
+    },
+    setComponentEnbaled: function(target, enable) {
+        this[target].enable = enable;
+    },
+    getComponentEnabled: function(target) {
+        return this[target].enable;
+    },
+
+    /**
      *
-     * below is the showlayer private method.
+     * below is the show layer private method.
      * @private
      */
-    _setAction: function() {
-        var easyTime = Config.duration.EASY_BUTTON / 1000;
-        var hardTime = Config.duration.HARD_BUTTON / 1000;
-        var positionTime = Config.duration.ADJUST_POSITION_BUTTON / 1000;
-        this.attackEasyUp = cc.sequence(
-            cc.moveTo(easyTime, cc.p(this.attackButton.x + Config.ATTACK_PROGRESS_X, this.attackButton.y + Config.ATTACK_PROGRESS_Y + 300)),
-            cc.callFunc(function() {
-                //_dispatchCustomEvent(Config.events.EASY_READY, Config.PLAYER);
-                this.getParent().eventCenter.dispatchEvent(Config.events.EASY_READY, {role: Config.PLAYER, time: new Date().getTime()});
-            }.bind(this), this)
-        );
-        this.attackHardUp = cc.sequence(
-            cc.moveTo(hardTime, cc.p(this.attackButton.x + Config.ATTACK_PROGRESS_X, this.attackButton.y + Config.ATTACK_PROGRESS_Y + 300)),
-            cc.callFunc(function() {
-                //_dispatchCustomEvent(Config.events.HARD_READY, Config.PLAYER);
-                this.getParent().eventCenter.dispatchEvent(Config.events.HARD_READY, {role: Config.PLAYER, time: new Date().getTime()});
-            }.bind(this), this)
-        );
-        this.positionMovement = cc.sequence(
-            cc.moveTo(positionTime, cc.p(this.positionButton.x, this.positionButton.y)),
-            cc.callFunc(function() {
-                for(var i in this.moveButtons) {
-                    var e = this.moveButtons[i];
-                    if (!e.getParent()) {
-                        this.addChild(e);
-                    }
-                }
-                //_dispatchCustomEvent(Config.events.POSITION_END, Config.PLAYER);
-                //this.getParent().eventCenter.dispatchEvent(Config.events.POSITION_END, {role: Config.PLAYER, time: new Date().getTime()});
-            }.bind(this), this)
-        );
-        /*
-         var _dispatchCustomEvent = function(event, role) {
-         this.getParent().eventCenter.dispatchEvent(event, {role: role, time: new Date().getTime()});
-         };
-         */
-        //this.attackProgressDown = cc.moveTo(easyTime, cc.p(this.attackButton.x + Config.ATTACK_PROGRESS_X, this.attackButton.y + Config.ATTACK_PROGRESS_Y));
-    },
     _setElements: function() {
         var bg = new cc.Sprite(res.backGround);
         bg.x = Config.CENTER_X;
@@ -240,8 +459,11 @@ var ShowLayer = cc.Layer.extend({
         this.addChild(bg);
 
         var position = new cc.Sprite(res.position);
-        position.x = Config.CENTER_X;
-        position.y = Config.CENTER_Y + Config.POSITION_Y;
+        position.attr({
+            x : Config.CENTER_X,
+            y : Config.CENTER_Y + Config.POSITION_Y,
+            enable: true
+        });
         this.addChild(position, 1);
 
         var slideLeft = new cc.Sprite(res.slide);
@@ -284,31 +506,35 @@ var ShowLayer = cc.Layer.extend({
         hardAttack.y = Config.CENTER_Y + Config.HARD_Y;
         hardAttack.setName(Config.HARD_ATTACK_MODE);
 
-        var energyLeftBar = new cc.Sprite(res.whiteBar);
+        var energyLeftBar = new cc.Sprite(res["Bar" + this.playerEnergyIndex]);
         energyLeftBar.x = Config.CENTER_X + Config.ENERGY_L_X;
         energyLeftBar.y = Config.CENTER_Y + Config.ENERGY_Y;
-        this.addChild(energyLeftBar);
+        var energyLeftStencil = new cc.Sprite(res.Bar0);
+        energyLeftStencil.x = energyLeftBar.x;
+        energyLeftStencil.y = energyLeftBar.y;
+        var energyLeftMask = new cc.ClippingNode(energyLeftStencil);
+        energyLeftMask.addChild(energyLeftBar);
+        this.addChild(energyLeftMask);
 
-        var energyRightBar = new cc.Sprite(res.redBar);
+        var energyRightBar = new cc.Sprite(res["Bar" + this.playerEnergyIndex]);
         energyRightBar.x = Config.CENTER_X + Config.ENERGY_R_X;
         energyRightBar.y = Config.CENTER_Y + Config.ENERGY_Y;
-        this.addChild(energyRightBar);
+        var energyRightStencil = new cc.Sprite(res.Bar0);
+        energyRightStencil.x = energyRightBar.x;
+        energyRightStencil.y = energyRightBar.y;
+        var energyRightMask = new cc.ClippingNode(energyRightStencil);
+        energyRightMask.addChild(energyRightBar);
+        this.addChild(energyRightMask);
 
-        this.energyBars[Config.LEFT_SERIES] = energyLeftBar;
-        this.energyBars[Config.RIGHT_SERIES] = energyRightBar;
-
-        var energyLeftDot = new cc.Sprite(res.whiteDot);
+        var energyLeftDot = new cc.Sprite(res["Dot" + this.playerEnergyIndex]);
         energyLeftDot.x = Config.CENTER_X + Config.ENERGY_L_X;
         energyLeftDot.y = Config.CENTER_Y + Config.DOT_Y;
         this.addChild(energyLeftDot);
 
-        var energyRightDot = new cc.Sprite(res.redDot);
+        var energyRightDot = new cc.Sprite(res["Dot" + this.playerEnergyIndex]);
         energyRightDot.x = Config.CENTER_X + Config.ENERGY_R_X;
         energyRightDot.y = Config.CENTER_Y + Config.DOT_Y;
         this.addChild(energyRightDot);
-
-        this.energyButtons[Config.LEFT_SERIES] = energyLeftDot;
-        this.energyButtons[Config.RIGHT_SERIES] = energyRightDot;
 
         var defenceProgress = new cc.Sprite(res.buttonProgress);
         defenceProgress.x = defence.x;
@@ -340,8 +566,7 @@ var ShowLayer = cc.Layer.extend({
         var positionStencil = new cc.Sprite(res.buttonProgress);
         positionStencil.x = position.x;
         positionStencil.y = position.y;
-        var positionProgressMask = new cc.ClippingNode();
-        positionProgressMask.stencil = positionStencil;
+        var positionProgressMask = new cc.ClippingNode(positionStencil);
         positionProgressMask.addChild(positionProgress);
         //positionProgressMask.setInverted(true);
         this.addChild(positionProgressMask);
@@ -361,28 +586,33 @@ var ShowLayer = cc.Layer.extend({
         statusEnemy.y = Config.CENTER_Y + Config.STATUS_ENEMY_Y;
         this.addChild(statusEnemy);
 
-        var faceEnemy = new cc.Sprite(res.face);
+        var faceEnemy = new cc.Sprite(res.enemyFacedToMe);
         faceEnemy.x = Config.CENTER_X + Config.FACE_X;
         faceEnemy.y = Config.CENTER_Y + Config.FACE_Y;
         this.addChild(faceEnemy);
 
-        var energyEnemyDot = new cc.Sprite(res.greenDot);
+        var energyEnemyDot = new cc.Sprite(res["Dot" + this.playerEnergyIndex]);
         energyEnemyDot.x = Config.CENTER_X + Config.DOT_ENEMY_X;
         energyEnemyDot.y = Config.CENTER_Y + Config.DOT_ENEMY_Y;
         this.addChild(energyEnemyDot);
 
-        var energyEnemyBar = new cc.Sprite(res.greenBar);
+        var energyEnemyBar = new cc.Sprite(res["Bar" + this.playerEnergyIndex]);
         energyEnemyBar.x = Config.CENTER_X + Config.ENERGY_ENEMY_X;
         energyEnemyBar.y = Config.CENTER_Y + Config.ENERGY_ENEMY_Y;
-        this.addChild(energyEnemyBar);
-
+        var energyEnemyStencil = new cc.Sprite(res.Bar2);
+        energyEnemyStencil.x = energyEnemyBar.x;
+        energyEnemyStencil.y = energyEnemyBar.y;
+        var energyEnemyMask = new cc.ClippingNode(energyEnemyStencil);
+        energyEnemyMask.addChild(energyEnemyBar);
+        this.addChild(energyEnemyMask);
+        
         for (var i = 0; i < Config.ENERGY_LENGTH; i++) {
-            var numberMe = new cc.Sprite("res/" + i + "Rec.png");
+            var numberMe = new cc.Sprite(res["Rec" + i]);
             numberMe.x = Config.CENTER_X + Config.ENERGY_NUMBER_X + i * Config.ENERGY_NUMBER_INTERVAL;
             numberMe.y = Config.CENTER_Y + Config.ENERGY_NUMBER_ME_Y;
             this.addChild(numberMe);
 
-            var numberEnemy = new cc.Sprite("res/" + i + "Rec.png");
+            var numberEnemy = new cc.Sprite(res["Rec" + i]);
             numberEnemy.x = numberMe.x;
             numberEnemy.y = Config.CENTER_Y + Config.ENERGY_NUMBER_ENEMY_Y;
             this.addChild(numberEnemy);
@@ -392,15 +622,14 @@ var ShowLayer = cc.Layer.extend({
             labelMe.y = numberMe.y;
             labelMe.setColor(Config.ENERGY_LIGHT_COLORS[i]);
             this.addChild(labelMe);
+            this.Energy.player[i] = labelMe;
 
             var labelEnemy = new cc.LabelTTF("48", "arial", 80);
             labelEnemy.x = numberEnemy.x;
             labelEnemy.y = numberEnemy.y;
             labelEnemy.setColor(Config.ENERGY_LIGHT_COLORS[i]);
             this.addChild(labelEnemy);
-
-            this.energyLabelsMe.push(labelMe);
-            this.energyLabelsEnemy.push(labelEnemy);
+            this.Energy.enemy[i] = labelEnemy;
         }
 
         this.attackButton = attackMe;
@@ -417,12 +646,17 @@ var ShowLayer = cc.Layer.extend({
         this.easyButton = easyAttack;
         this.hardButton = hardAttack;
         this.actionStatus = statusEnemy;
-        this.energyDotEnemy = energyEnemyDot;
-        this.energyBarEnemy = energyEnemyBar;
+        this.energyBars[Config.LEFT_SERIES] = energyLeftBar;
+        this.energyBars[Config.RIGHT_SERIES] = energyRightBar;
+        this.energyBars[Config.ENEMY.category] = energyEnemyBar;
+        this.energyDots[Config.LEFT_SERIES] = energyLeftDot;
+        this.energyDots[Config.RIGHT_SERIES] = energyRightDot;
+        this.energyDots[Config.ENEMY.category] = energyEnemyDot;
         this.defenceProgress = defenceProgress;
         this.attackProgress = attackProgress;
         this.positionProgress = positionProgress;
-    }
+        this.positionMask = positionProgressMask;
+    },
 });
 
 

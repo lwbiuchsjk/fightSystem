@@ -5,56 +5,96 @@ var SysFlowControl = cc.Layer.extend({
 	eventCenter: null,
 	statusCalculateLayer: null,
 	showLayer: null,
+	operateLayer: null,
+	player: null,
 
 	ctor: function() {
 		this._super();
 		this.setName(Config.FLOW_CONTROL_LAYER);
-		/*
-		this.eventCenter = new CustomEventCenter();
-
-
-		var events = Config.events;
-		for(var i in events) {
-			this.eventCenter.addListener(events[i], this[events[i]].bind(this));
-		}
-		this.eventCenter.addListener(Config.HARD_ATTACK_MODE, this.hardAttack);
-		this.eventCenter.addListener(Config.MOVE_BACKWARD, this.moveBackward);
-		*/
-
-		console.log("flow layer OK!!!");
 	},
 	/**
 	 *
-	 * @param {object} value. "role" is the String that defined in the Config.js file. "time" is the ms time class, that is easy to calculate with "Config.duration".
+	 * below is the functions related to attack
+	 *
+	 * * @param {object} value. "role" is the String that defined in the Config.js file. "time" is the ms time class, that is easy to calculate with "Config.duration".
 	 * the above-like-function is all have the VALUE to be the param.
+	 *
 	 */
+	attackBegin: function() {
+		this.showLayer.attackBegan();
+	},
 	easyAttackBegin: function(value/*role, time*/) {
 		var chct = this.statusCalculateLayer.getCharacter(value.role);
 		if (!chct.isHappened(Config.EASY_ATTACK_MODE, Config.events.EASY_BEGIN)) {
 			chct.setActionTime(Config.EASY_ATTACK_MODE, Config.events.EASY_BEGIN, value.time);
-			this.showLayer.easyAttackBegin();
-			var attackProgress = this.showLayer.attackProgress;
-			var upAction = this.showLayer.attackEasyUp;
-			if (upAction.getTarget() == null) {
-				attackProgress.runAction(upAction);
+			switch(value.role) {
+				case Config.PLAYER : {
+					this.showLayer.easyAttackBegin();
+					break;
+				}
+				case Config.ENEMY.category: {
+					console.info(chct.easyAttack[Config.events.EASY_BEGIN]);
+					this.showLayer.enemyEasyBegin();
+					break;
+				}
 			}
-			console.info("EASY BEGIN!!!");
+			/*
+			 * DEBUG
+			 * this.adjustPositionGo({role: chct.getName(), time: Date.now()});
+			 */
 		}
 	},
 	easyAttackReady: function(value/*role, time*/) {
 		var chct = this.statusCalculateLayer.getCharacter(value.role);
 		if (!chct.isHappened(Config.EASY_ATTACK_MODE, Config.events.EASY_READY)) {
 			chct.setActionTime(Config.EASY_ATTACK_MODE, Config.events.EASY_READY, value.time);
-			this.showLayer.easyAttackReady();
-			console.info("EASY READY!!!");
+			switch(value.role) {
+				case Config.PLAYER : {
+					this.showLayer.easyAttackReady();
+					break;
+				}
+				case Config.ENEMY.category: {
+					this.showLayer.enemyEasyReady();
+					console.info(chct.easyAttack[Config.events.EASY_READY] - chct.easyAttack[Config.events.EASY_BEGIN]);
+					break;
+				}
+			}
 		}
 	},
 	easyAttackGo: function(value/*role, time*/) {
 		var chct = this.statusCalculateLayer.getCharacter(value.role);
 		if (!chct.isHappened(Config.EASY_ATTACK_MODE, Config.events.EASY_GO)) {
-			chct.setActionTime(Config.EASY_ATTACK_MODE, Config.events.EASY_GO, value.time);
-			this.showLayer.attackFinished();
-			console.info("EASY GO!!!");
+			switch(value.role) {
+				case Config.PLAYER : {
+					this.showLayer.attackFinished();
+					break;
+				}
+				case Config.ENEMY.category: {
+					this.showLayer.enemyEasyEnd();
+					break;
+				}
+			}
+			if (!chct.isEnemyPosition(Config.enemyBroadsideOnMe)) {
+				chct.setActionTime(Config.EASY_ATTACK_MODE, Config.events.EASY_GO, value.time);
+				console.info(chct.easyAttack[Config.events.EASY_GO] - chct.easyAttack[Config.events.EASY_READY]);
+				var target = chct.getTarget();
+				var hitTime = chct.getHitTime();
+				target.setActionTime(Config.CHARACTER_STATUS, Config.events.GET_WOUNDED, value.time + hitTime * 1000);
+				var woundEvent = {
+					from: chct,
+					to: target,
+					time: Date.now(),
+					attackEnergy: chct.getAttackEnergy(),
+					ATTACK_FLAG: Config.EASY_ATTACK_MODE
+				};
+				this.scheduleOnce(function() {
+					this.eventCenter.dispatchEvent(Config.events.GET_WOUNDED, woundEvent);
+				}.bind(this), hitTime);
+			} else {
+				chct.attackEnded();
+				console.log("NO ACTION...");
+			}
+
 		}
 	},
 
@@ -62,73 +102,248 @@ var SysFlowControl = cc.Layer.extend({
 		var chct = this.statusCalculateLayer.getCharacter(value.role);
 		if (!chct.isHappened(Config.HARD_ATTACK_MODE, Config.events.HARD_BEGIN)) {
 			chct.setActionTime(Config.HARD_ATTACK_MODE, Config.events.HARD_BEGIN, value.time);
-			this.showLayer.hardAttackBegin();
-			var attackProgress = this.showLayer.attackProgress;
-			var upAction = this.showLayer.attackHardUp;
-			if (upAction.getTarget() == null) {
-				attackProgress.runAction(upAction);
+			switch(value.role) {
+				case Config.PLAYER : {
+					this.showLayer.hardAttackBegin();
+					console.info("HARD BEGIN!!!");
+					break;
+				}
+				case Config.ENEMY.category: {
+					break;
+				}
 			}
-			console.info("HARD BEGIN!!!");
+
 		}
 	},
 	hardAttackReady: function(value/*role, time*/) {
 		var chct = this.statusCalculateLayer.getCharacter(value.role);
 		if (!chct.isHappened(Config.HARD_ATTACK_MODE, Config.events.HARD_READY)) {
 			chct.setActionTime(Config.HARD_ATTACK_MODE, Config.events.HARD_READY, value.time);
-			this.showLayer.hardAttackReady();
-			console.info("HARD READY!!!");
+			switch(value.role) {
+				case Config.PLAYER : {
+					this.showLayer.hardAttackReady();
+					console.info("HARD READY!!!");
+					break;
+				}
+				case Config.ENEMY.category: {
+					break;
+				}
+			}
+
 		}
 	},
 	hardAttackGo: function(value/*role, time*/) {
 		var chct = this.statusCalculateLayer.getCharacter(value.role);
 		if (!chct.isHappened(Config.HARD_ATTACK_MODE, Config.events.HARD_GO)) {
-			chct.setActionTime(Config.HARD_ATTACK_MODE, Config.events.HARD_GO, value.time);
-			this.showLayer.attackFinished();
-			console.info("HARD GO!!!");
+			switch(value.role) {
+				case Config.PLAYER : {
+					this.showLayer.attackFinished();
+					break;
+				}
+				case Config.ENEMY.category: {
+					break;
+				}
+			}
+			if (!chct.isEnemyPosition(Config.enemyBroadsideOnMe)) {
+				chct.setActionTime(Config.HARD_ATTACK_MODE, Config.events.HARD_GO, value.time);
+				var target = chct.getTarget();
+				var hitTime = chct.getHitTime();
+				target.setActionTime(Config.CHARACTER_STATUS, Config.events.GET_WOUNDED, value.time + hitTime * 1000);
+				var woundEvent = {
+					from: chct,
+					to: target,
+					time: Date.now(),
+					attackEnergy: chct.getAttackEnergy(),
+					ATTACK_FLAG: Config.HARD_ATTACK_MODE
+				};
+				this.scheduleOnce(function() {
+					this.eventCenter.dispatchEvent(Config.events.GET_WOUNDED, woundEvent);
+				}.bind(this), hitTime);
+				console.info("HARD GO!!!");
+			} else {
+				chct.attackEnded();
+				console.log("NO ACTION...");
+			}
 		}
-		//console.log(this.statusCalculateLayer.getCharacter(value.role).hardAttack);
 	},
 
-	moveAside: function(value/*role, time*/) {
+	getWounded: function(value/*from, to, time, attackEnergy, ATTACK_FLAG*/) {
+		var source = value.from;
+		var target = value.to;
+		var positionCondition = target.isEnemyPosition(Config.enemyFacedToMe, source);
+		var defenceCondition = target.isDefenceBegan() && !target.isDefenceEnded();
+		var attackEffect = source.getAttackEffect(value.ATTACK_FLAG);
+		target.checkWound(value.attackEnergy, attackEffect, positionCondition, defenceCondition);
+		source.attackEnded();
+	},
+	/**
+	 *
+	 * below is the related position action control function
+	 *
+	 */
+	moveAsideBegin: function(value/*role, time*/) {
 		var chct = this.statusCalculateLayer.getCharacter(value.role);
-		var isBegan = chct.isHappened(Config.ADJUST_POSITION, Config.events.POSITION_BEGIN);
-		var isMoved = chct.isHappened(Config.ADJUST_POSITION, Config.events.MOVE_ASIDE);
-		if (isBegan && !isMoved) {
-			chct.setActionTime(Config.ADJUST_POSITION, Config.events.MOVE_ASIDE, value.time);
-			console.info("move aside");
+		chct.setActionTime(Config.ADJUST_POSITION, Config.events.MOVE_ASIDE_BEGIN, value.time);
+		chct.getTarget().setEnemyMoving(0);
+		console.info("move aside");
+	},
+	moveAsideEnd: function(value/*role, time, FLAG*/) {
+		var chct = this.statusCalculateLayer.getCharacter(value.role);
+		chct.setActionTime(Config.ADJUST_POSITION, Config.events.MOVE_ASIDE_END, value.time);
+		if (chct.isSatisfiedMoveTime(value.FLAG)) {
+			chct.getTarget().setEnemyMoving(1);
+			chct.checkPosition(Config.events.MOVE_ASIDE_END);
 		}
 	},
-	moveForward: function(value/*role, time*/) {
+	moveForwardBegin: function(value/*role, time*/) {
 		var chct = this.statusCalculateLayer.getCharacter(value.role);
-		var isBegan = chct.isHappened(Config.ADJUST_POSITION, Config.events.POSITION_BEGIN);
-		var isMoved = chct.isHappened(Config.ADJUST_POSITION, Config.events.MOVE_FORWARD);
-		if (isBegan && !isMoved) {
-			chct.setActionTime(Config.ADJUST_POSITION, Config.events.MOVE_FORWARD, value.time);
-			console.info("move forward");
+		chct.setActionTime(Config.ADJUST_POSITION, Config.events.MOVE_FORWARD_BEGIN, value.time);
+		chct.getTarget().setEnemyMoving(0);
+		console.info("move forward");
+	},
+	moveForwardEnd: function(value/*role, time, FLAG*/) {
+		var chct = this.statusCalculateLayer.getCharacter(value.role);
+		chct.setActionTime(Config.ADJUST_POSITION, Config.events.MOVE_FORWARD_END, value.time);
+		if (chct.isSatisfiedMoveTime(value.FLAG)) {
+			chct.getTarget().setEnemyMoving(1);
+			console.info("MOVE FORWARD SUCCEED!!!");
+			chct.checkPosition();
 		}
 	},
-	moveBackward: function(value/*role, time*/) {
+	moveBackwardBegin: function(value/*role, time*/) {
 		var chct = this.statusCalculateLayer.getCharacter(value.role);
-		var isBegan = chct.isHappened(Config.ADJUST_POSITION, Config.events.POSITION_BEGIN);
-		var isMoved = chct.isHappened(Config.ADJUST_POSITION, Config.events.MOVE_BACKWARD);
-		if (isBegan && !isMoved) {
-			chct.setActionTime(Config.ADJUST_POSITION, Config.events.MOVE_BACKWARD, value.time);
-			console.info("move backward");
+		chct.setActionTime(Config.ADJUST_POSITION, Config.events.MOVE_BACKWARD_BEGIN, value.time);
+		chct.getTarget().setEnemyMoving(0);
+		console.info("move backward");
+	},
+	moveBackwardEnd: function(value/*role, time, FLAG*/) {
+		var chct = this.statusCalculateLayer.getCharacter(value.role);
+		chct.setActionTime(Config.ADJUST_POSITION, Config.events.MOVE_BACKWARD_END, value.time);
+		if (chct.isSatisfiedMoveTime(value.FLAG)) {
+			chct.getTarget().setEnemyMoving(1);
+			console.info("MOVE BACKWARD SUCCEED!!!");
+			chct.checkPosition();
 		}
 	},
-	adjustFinished: function(value/*role, time*/) {
-		console.info("ADJUST FINISHED!!!");
+	adjustPositionGo: function(value/*role, time, FLAG*/) {
+		// the FLAG is used to distinguish the callee operation which is dragged to right or to left.
+		var chct = this.statusCalculateLayer.getCharacter(value.role);
+		var adjustEvent = {
+			role: value.role,
+			time: value.time
+		};
+		this.eventCenter.dispatchEvent(Config.events.OPERATE_ADJUST, adjustEvent);
+		if (chct.isInAdjustWindow()) {
+			if (chct.getNoActionTime() <= 0) {
+				if (chct.isHappened(Config.EASY_ATTACK_MODE, Config.events.EASY_BEGIN)) {
+					var easyEvent = {
+						role: value.role,
+						time: value.time
+					};
+					chct.setActionTime(Config.EASY_ATTACK_MODE, Config.events.EASY_READY, easyEvent);
+					switch(value.role) {
+						case Config.PLAYER : {
+							this.showLayer.attackFlashReady(Config.EASY_ATTACK_MODE);
+
+							break;
+						}
+						case Config.ENEMY.category: {
+							break;
+						}
+					}
+					chct.setAdjustWindow();
+				} else
+				if (chct.isHappened(Config.HARD_ATTACK_MODE, Config.events.HARD_BEGIN)) {
+					var hardEvent = {
+						role: value.role,
+						time: value.time
+					};
+					chct.setActionTime(Config.HARD_ATTACK_MODE, Config.events.HARD_READY, hardEvent);
+					switch(value.role) {
+						case Config.PLAYER : {
+							this.showLayer.attackFlashReady(Config.HARD_ATTACK_MODE);
+
+							break;
+						}
+						case Config.ENEMY.category: {
+							break;
+						}
+					}
+					chct.setAdjustWindow();
+				} else
+				if (value.FLAG !== null && chct.isEnemyPosition(Config.enemyFacedToMe) && !chct.isHappened(Config.ADJUST_POSITION, Config.events.MOVE_ASIDE_BEGIN)) {
+					console.log(value.FLAG !== null);
+					var positionBeginEvent = {
+						role: value.role,
+						time: value.time
+					};
+					this.eventCenter.dispatchEvent(Config.events.MOVE_ASIDE_BEGIN, positionBeginEvent);
+					switch(value.role) {
+						case Config.PLAYER : {
+							this.showLayer.showFlashPosition(value.FLAG);
+
+							break;
+						}
+						case Config.ENEMY.category: {
+							break;
+						}
+					}
+				} else
+				if (chct.isEnemyPosition(Config.enemyFacedToMe) && chct.isHappened(Config.ADJUST_POSITION, Config.events.MOVE_ASIDE_BEGIN)) {
+					var positionEndEvent = {
+						role: value.role,
+						time: value.time,
+						FLAG: value.FLAG
+					};
+					this.eventCenter.dispatchEvent(Config.events.MOVE_ASIDE_END, positionEndEvent);
+					chct.setAdjustWindow();
+				} else
+				if (chct.isEnemyPosition(Config.enemyBroadsideOnMe)) {
+					var turnEvent = {
+						role: value.role,
+						time: value.time
+					};
+					this.eventCenter.dispatchEvent(Config.events.ADJUST_TO_FACE, turnEvent)
+				}
+			} else {
+				var noActionEvent = {
+					character: value.role
+				};
+				this.eventCenter.dispatchEvent(Config.events.NO_ACTION_STOP, noActionEvent);
+				chct.setAdjustWindow();
+			}
+		}
+	},
+	adjust2Face: function(value/*role, time*/) {
+		var chct = this.statusCalculateLayer.getCharacter(value.role);
+		chct.checkPosition(Config.events.ADJUST_TO_FACE);
+		/*
+		var isFace2Enemy = chct.isEnemyPosition(Config.enemyFacedToMe);
+		var isBroadOnEnemy = chct.isEnemyPosition(Config.broadsideOnEnemy;
+		if (!isFace2Enemy && isBroadOnEnemy) {
+			chct.checkPosition();
+		}
+		*/
+	},
+	operateAdjust: function(value/*role, time*/) {
+		var chct = this.statusCalculateLayer.getCharacter(value.role);
+		chct.setActionTime(Config.ADJUST_POSITION, Config.events.OPERATE_ADJUST, value.time);
 	},
 	positionBegin: function(value/*role, time*/) {
 		var chct = this.statusCalculateLayer.getCharacter(value.role);
 		if (!chct.isHappened(Config.ADJUST_POSITION, Config.events.POSITION_BEGIN)) {
 			chct.setActionTime(Config.ADJUST_POSITION, Config.events.POSITION_BEGIN, value.time);
-			var positionMovement = this.showLayer.positionMovement;
-			var positionProgress = this.showLayer.positionProgress;
-			if (positionMovement.getTarget() == null) {
-				positionProgress.runAction(positionMovement);
-				console.info("position begin");
+			switch(value.role) {
+				case Config.PLAYER : {
+					this.showLayer.adjustPositionBegan(chct.getPositionDuration());
+					console.info("POSITION BEGIN!!!");
+					break;
+				}
+				case Config.ENEMY.category: {
+					break;
+				}
 			}
+
 		}
 	},
 	positionEnd: function(value/*role, time*/) {
@@ -137,47 +352,316 @@ var SysFlowControl = cc.Layer.extend({
 		var isEnded = chct.isHappened(Config.ADJUST_POSITION, Config.events.POSITION_END);
 		if (isBegan && !isEnded) {
 			chct.setActionTime(Config.ADJUST_POSITION, Config.events.POSITION_END, value.time);
-			console.info("position end");
+			console.info("POSITION END!!!");
+		}
+	},
+	noActionGo: function(value/*character, FLAG*/) {
+		var chct = this.statusCalculateLayer.getCharacter(value.character);
+		chct.setNoActionFlag(true);
+		var listener, replacement;
+		switch(value.character) {
+			case Config.PLAYER: {
+				if (value.FLAG == Config.ADJUST_POSITION) {
+					listener = this.operateLayer.positionListener;
+					replacement = this.operateLayer.noActionPositionListener;
+				} else {
+					this.showLayer.noPosition();
+				}
+				this._playerNoActionGo(listener, replacement);
+				chct.cleanMoveDirection();
+				break;
+			}
+			case Config.ENEMY.category: {
+				this.showLayer.enemyNoActionGo();
+				break;
+			}
+		}
+		this.eventCenter.dispatchEvent(Config.events.POSITION_END, {role: value.character, time: Date.now()});
+		console.info(value.character + " NO ACTION!!!");
+	},
+	_playerNoActionGo: function(listener, noAction) {
+		var showLayer = this.showLayer;
+		if (showLayer.noActionPlayer == null) {
+			showLayer.noActionPlayer = cc.sequence(
+				cc.callFunc(function() {
+					cc.eventManager.pauseTarget(this.attackButton);
+					cc.eventManager.pauseTarget(this.defenceButton);
+					if (listener != null) {
+						cc.eventManager.removeListener(listener);
+						//console.log(listener.isEnabled());
+						cc.eventManager.addListener(noAction, this.positionButton);
+						//console.log(noAction.isEnabled());
+					} else {
+						cc.eventManager.pauseTarget(this.positionButton);
+					}
+					this.noAttack();
+					this.noDefence();
+				}.bind(showLayer)),
+				cc.delayTime(1000)
+			)
+		}
+		if (showLayer.noActionPlayer.getTarget() == null) {
+			showLayer.runAction(showLayer.noActionPlayer);
+		}
+	},
+	/**
+	 * TODO how to figure out whether the listener had be registered?
+	 */
+	noActionStop: function(value/*character, FLAG*/) {
+		var chct = this.statusCalculateLayer.getCharacter(value.character);
+		if (chct.isNoActionFlag()) {
+			var listener, replacement;
+			switch(value.character) {
+				case Config.PLAYER: {
+					//if (value.FLAG == Config.ADJUST_POSITION) {
+					listener = this.operateLayer.noActionPositionListener;
+					replacement = this.operateLayer.positionListener;
+					//} else {
+					//}
+					this._playerNoActionStop(listener, replacement);
+					break;
+				}
+				case Config.ENEMY.category: {
+					this.showLayer.enemyNoActionStop();
+					break;
+				}
+			}
+			console.log("resume");
+		}
+		chct.setNoActionFlag(false);
+
+		//console.info("NO ACTION STOP");
+		//this.showLayer.playerNoActionStop();
+	},
+	_playerNoActionStop: function(listener, position) {
+		var showLayer = this.showLayer;
+		if (showLayer.noActionPlayer != null && showLayer.noActionPlayer.getTarget() == showLayer) {
+			showLayer.stopAction(showLayer.noActionPlayer);
+			showLayer.noActionPlayer.setTarget(null);
+			cc.eventManager.resumeTarget(showLayer.attackButton);
+			cc.eventManager.resumeTarget(showLayer.defenceButton);
+			if (listener == null) {
+				cc.eventManager.resumeTarget(showLayer.positionButton);
+			} else {
+				cc.eventManager.removeListener(listener);
+				cc.eventManager.addListener(position, showLayer.positionButton);
+			}
+			showLayer.doAttack();
+			showLayer.doDefence();
+			showLayer.doPosition();
 		}
 	},
 
+	/**
+	 *
+	 * below is the related defence action control function
+	 *
+	 */
 	defenceBegin: function(value/*role, time*/) {
 		var chct = this.statusCalculateLayer.getCharacter(value.role);
 		var event = Config.events.DEFENCE_BEGIN;
 		if (!chct.isDefenceBegan()) {
-			chct.setDefenceTime(event, value.time);
+			chct.setActionTime(Config.DEFENCE_ACTION, event, value.time);
 			chct.setDefenceDuration(event);
-			this.showLayer.defenceAction(event, chct.getDefenceDuration() / 1000);
-			console.info("DEFENCE BEGIN!!!");
+			switch(value.role) {
+				case Config.PLAYER : {
+					this.showLayer.defenceAction(event, chct.getDefenceDuration() / 1000);
+					console.info("DEFENCE BEGIN!!!");
+					break;
+				}
+				case Config.ENEMY.category: {
+					break;
+				}
+			}
+
 		}
 	},
 	defenceEnd: function(value/*role, time*/) {
 		var chct = this.statusCalculateLayer.getCharacter(value.role);
 		var event = Config.events.DEFENCE_END;
 		if (!chct.isDefenceEnded()) {
-			chct.setDefenceTime(event, value.time);
+			chct.setActionTime(Config.DEFENCE_ACTION, event, value.time);
 			chct.setDefenceDuration(event);
-			var time = chct.getDefenceDuration() / 1000;
-			this.showLayer.defenceAction(event, Config.duration.DEFENCE_MAX_TIME / 1000 - time);
-			console.info("DEFENCE END!!!");
+			switch(value.role) {
+				case Config.PLAYER : {
+					this.showLayer.defenceAction(event, chct.calcDefenceEndTime(chct.getDefenceDuration()) / 1000);
+					console.info("DEFENCE END!!!");
+					break;
+				}
+				case Config.ENEMY.category: {
+					break;
+				}
+			}
+
 		}
 	},
 	blockBegin: function(value/*role, time*/) {
 		var chct = this.statusCalculateLayer.getCharacter(value.role);
 		if (chct.isBlockReady(value.time)) {
-			this.showLayer.blockBegin();
-			console.info("BLOCK BEGIN!!!");
+			switch(value.role) {
+				case Config.PLAYER : {
+					this.showLayer.blockBegin();
+					console.info("BLOCK BEGIN!!!");
+
+					break;
+				}
+				case Config.ENEMY.category: {
+					break;
+				}
+			}
+			chct.setActionTime(Config.DEFENCE_ACTION, Config.events.BLOCK_BEGIN, value.time);
+			chct.checkBlock(value.time);
 		}
 	},
 	blockFail: function(value/*role, time*/) {
 
 	},
-	blockGo: function(value/*role, time*/) {
-
+	blockGo: function(value/*role, noAction*/) {
+		var chct = value.role;
+		chct.setNoActionTime(value.noAction);
+		console.info("BLOCK SUCCEED!!!");
 	},
+	/**
+	 *
+	 * below is the related energy action control function
+	 *
+	 */
+	operateEnergyBegin: function(value/*role, time*/) {
+		var chct = this.statusCalculateLayer.getCharacter(value.role);
+		if(!chct.isOperateEnergyBegan()) {
+			chct.setActionTime(Config.OPERATE_ENERGY, Config.events.OPERATE_ENERGY_BEGIN, value.time);
+			console.info("OPERATE ENERGY!!!");
+		}
+	},
+	operateEnergyEnd: function(value/*role, time*/) {
+		var chct = this.statusCalculateLayer.getCharacter(value.role);
+		if(!chct.isOperateEnergyEnded()) {
+			chct.setActionTime(Config.OPERATE_ENERGY, Config.events.OPERATE_ENERGY_END, value.time);
+			console.info("OPERATE ENERGY END!!!");
+		}
+	},
+	initShowLayer: function(value/*time*/) {
+		var player = this.statusCalculateLayer.getChildByName(Config.PLAYER);
+		var enemy = this.statusCalculateLayer.getChildByName(Config.ENEMY.category);
+		var showLayer = this.showLayer;
 
-	setLayer: function(showLayer, statusCalculate) {
-		this.statusCalculateLayer = statusCalculate;
-		this.showLayer = showLayer;
+		// init player energy index and enemy energy index in show layer
+		var playerIndex = player.getEnergyIndex();
+		var enemyIndex = enemy.getEnergyIndex();
+		showLayer.setEnergyIndex(player.getName(), playerIndex);
+		showLayer.setEnergyIndex(enemy.getName(), enemyIndex);
+		player.setEnergyBeginTime(playerIndex, value.time);
+		enemy.setEnergyBeginTime(enemyIndex, value.time);
+
+		// init easyUp and hardUp
+		var easyTime = player.getEasyTime();
+		var hardTime = player.getHardTime();
+		this.showLayer.initAttackMovement(easyTime, hardTime);
+
+		// init position label
+		this.eventCenter.dispatchEvent(Config.events.SET_POSITION_LABEL);
+
+		// init enemy status
+		this.showLayer.enemyNoActionStop(); //DEBUG
+
+		// init show layer frame time
+		showLayer.frameTime = player.status.frameTime;
+
+		/**
+		 *  set show layer frame time
+		 * 	TODO
+		 * 	is it beautiful enough to start schedule action in here?
+		 */
+		showLayer.optimizedSchedule(showLayer.energyRotation, showLayer.frameTime);
+		console.log("ENERGY BEGIN!!");
+	},
+	energyDurationBegin: function(value/*role, lastIndex, index, time*/) {
+		var chct = this.statusCalculateLayer.getCharacter(value.role);
+		if (chct.isOneDuration(value.lastIndex, value.index)) {
+			var nextIndex = (value.index + 1) % Config.ENERGY_LENGTH;
+			chct.setEnergyIndex(nextIndex);
+			chct.setEnergyBeginTime(nextIndex, value.time);
+			if (chct.isOperateEnergyBegan() && !chct.isOperateEnergyEnded()) {
+				chct.setAttackEnergy(nextIndex);
+			}
+			switch(value.role) {
+				case Config.PLAYER : {
+					this.showLayer.nextEnergyRotation(nextIndex, Config.LEFT_SERIES);
+					this.showLayer.nextEnergyRotation(nextIndex, Config.RIGHT_SERIES);
+					break;
+				}
+				case Config.ENEMY.category: {
+					this.showLayer.nextEnergyRotation(nextIndex, Config.ENEMY.category);
+					break;
+				}
+			}
+
+		}
+	},
+	energyRotationGo: function(value/*role, index, time*/) {
+		var chct = this.statusCalculateLayer.getCharacter(value.role);
+		var variation;
+		if (!chct.isOperateEnergyBegan() || chct.isOperateEnergyEnded()) {
+			variation = -chct.duration2Height(value.index);
+		} else {
+			variation = -Config.ENERGY_BAR_MAGNIFICATION * chct.duration2Height(value.index);
+		}
+		switch (value.role) {
+			case Config.PLAYER: {
+				this.showLayer.moveEnergyBar(variation, Config.LEFT_SERIES);
+				this.showLayer.moveEnergyBar(variation, Config.RIGHT_SERIES);
+				break;
+			}
+			case Config.ENEMY.category: {
+				this.showLayer.moveEnergyBar(variation, Config.ENEMY.category);
+				//console.log("enemy " + variation);
+				break;
+			}
+		}
+	},
+	/**
+	 * related status event function
+	 */
+	setEnergyLabel: function(value/*FLAG, index, energy*/) {
+		this.showLayer.setEnergyLabel(value.FLAG, value.index, value.energy);
+	},
+	setPositionLabel: function() {
+		// called in init showLayer;
+		var chct = this.statusCalculateLayer.getCharacter(Config.PLAYER);
+		this.showLayer.setPositionLabel(chct.getPositionLabel());
+	},
+	onEnter: function() {
+		this._super();
+		this.statusCalculateLayer = this.getParent().getChildByName(Config.STATUS_CALCULATE_LAYER);
+		this.showLayer = this.getParent().getChildByName(Config.SHOW_LAYER);
+		this.operateLayer = this.getParent().getChildByName(Config.OPERATE_LAYER);
+		this.eventCenter = this.getParent().eventCenter;
+		//this.player = this.statusCalculateLayer.getChildByName(Config.PLAYER);
+		//this._setPositionLabel();
+
+		console.log("flow layer OK!!!");
+	},
+	_doShowLayer: function(value/*role, show*/) {
+		switch(value.role) {
+			case Config.PLAYER : {
+				(value.show)();
+				break;
+			}
+			case Config.ENEMY.category: {
+				(value.show)();
+				break;
+			}
+		}
+	},
+	_setPositionLabel: function() {
+		var enemies = this.player.enemies;
+		var label;
+		for (var i in enemies) {
+			if (enemies[i] != null) {
+				label = i;
+				break;
+			}
+		}
+		this.showLayer.positionStatus.setTexture(res[label]);
 	}
 });

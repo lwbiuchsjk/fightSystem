@@ -11,6 +11,8 @@ var Config = {
 	 * the configs below is about the basic system data
 	 */
 	ENERGY_LENGTH: 5,
+	ENERGY_MIGHTY: [2, 3, 4, 0, 1],
+	ENERGY_WEAK: [1, 2, 3, 4, 0],
 
 	/**
 	 * the configs below is the name of layers
@@ -65,6 +67,9 @@ var Config = {
 	SLIDE_X: 300,  	//based on position and the position & move button`s width
 	MOVE_BUTTON_Y: 150,  	//based on position and the position & move button or other button`s height
 
+	ENERGY_DURATION_SAFE_WINDOW: 50,
+	ENERGY_BAR_MAGNIFICATION: 10,
+
 	/**
 	 * the configs below is about the energy data, like colors, effect, etc
 	 */
@@ -98,30 +103,60 @@ var Config = {
 	MOVE_BACKWARD: "moveBackward",
 
 	DEFENCE_ACTION: "defenceAction",
+	DEFENCE_DURATION: "DEFENCE_DURATION",
+
+	ENERGY_QUANTITY: "energyQuantity",
+
+	CHARACTER_STATUS: "status",
+	OPERATE_ENERGY: "operateEnergy",
+	ENERGY_INDEX: "ENERGY_INDEX",
+
+	POSITION_BUTTON: "positionButton",
 
 	/**
 	 * the configs below is about the function name with events
 	 */
 	events: {
+		ATTACK_BEGIN: "attackBegin",
 		EASY_BEGIN: "easyAttackBegin",
 		EASY_READY: "easyAttackReady",
 		EASY_GO: "easyAttackGo",
 		HARD_BEGIN: "hardAttackBegin",
 		HARD_READY: "hardAttackReady",
 		HARD_GO: "hardAttackGo",
+		GET_WOUNDED: "getWounded",
 
-		MOVE_ASIDE: "moveAside",
-		MOVE_FORWARD: "moveForward",
-		MOVE_BACKWARD: "moveBackward",
-		ADJUST_FINISHED: "adjustFinished",
+		MOVE_ASIDE_BEGIN: "moveAsideBegin",
+		MOVE_ASIDE_END: "moveAsideEnd",
+		MOVE_FORWARD_BEGIN: "moveForwardBegin",
+		MOVE_FORWARD_END: "moveForwardEnd",
+		MOVE_BACKWARD_BEGIN: "moveBackwardBegin",
+		MOVE_BACKWARD_END: "moveBackwardEnd",
+		OPERATE_ADJUST: "operateAdjust",
+		ADJUST_GO: "adjustPositionGo",
+		ADJUST_TO_FACE: "adjust2Face",
 		POSITION_BEGIN: "positionBegin",
 		POSITION_END: "positionEnd",
+
+		SET_POSITION_LABEL: "setPositionLabel",
 
 		DEFENCE_BEGIN: "defenceBegin",
 		BLOCK_BEGIN: "blockBegin",
 		BLOCK_FAIL: "blockFail",
 		BLOCK_GO: "blockGo",
-		DEFENCE_END: "defenceEnd"
+		DEFENCE_END: "defenceEnd",
+
+		OPERATE_ENERGY_BEGIN: "operateEnergyBegin",
+		OPERATE_ENERGY_END: "operateEnergyEnd",
+		ENERGY_DURATION_BEGIN: "energyDurationBegin",
+		INIT_SHOW_LAYER: "initShowLayer",
+		//PLAYER_ENERGY_ROTATION: "playerEnergyRotation",
+		//ENEMY_ENERGY_ROTATION: "enemyEnergyRotation",
+		ENERGY_ROTATION_GO: "energyRotationGo",
+
+		NO_ACTION_GO: "noActionGo",
+		NO_ACTION_STOP: "noActionStop",
+		SET_ENERGY_LABEL: "setEnergyLabel",
 	},
 
 	/**
@@ -133,11 +168,61 @@ var Config = {
 		//if the adjust action duration is less than ADJUST_POSITION_TIME, then we think the player meant to "adjust position", otherwise, we conclude the player meant to move.
 		ADJUST_POSITION_BUTTON: 500,
 		//the max defence time if player do not release his finger
-		DEFENCE_MAX_TIME: 1000
+		DEFENCE_MAX_TIME: 1000,
+		//the energy status duration
+		ENERGY: [5000, 5000, 5000, 5000, 5000],
+		//the duration time that on frame last
+		FRAME_TIME: 20,
+		HIT_TIME: 500,
+		// in the last 250 ms of attack which ends with HIT TIME£¬ the block action will success
+		BLOCK_WINDOW: 250,
+		MAX_NO_ACTON_TIME: 6000,
+		// unit is second
+		NO_ACTION_DELAY_TIME: 100,
+		// when the player click position button to "adjust position", the adjust position window sets the number like below, and the minus with time past. unit ms.
+		ADJUST_POSITION_WINDOW: 5000,
 	},
 
 	/**
-	 * character names
+	 * status
 	 */
-	PLAYER: "player"
+	enemyFacedToMe: "enemyFacedToMe",
+	enemyBroadsideOnMe: "enemyBroadsideOnMe",
+	broadsideOnEnemy: "broadsideOnEnemy",
+
+	/**
+	 * characters
+	 */
+	PLAYER: "player",
+	ENEMY: {
+		category: "enemy",
+	},
+	/**
+	 * attack effect
+	 * getWounded can be searched by Config.events.GET_WOUNDED,
+	 * noAction can be searched by Config.events.NO_ACTION,
+	 */
+	easyAttack: {
+		getWounded: 2,
+		noAction: 250,
+	},
+	hardAttack: {
+		getWounded: 4,
+		noAction: 500,
+	},
+	ATTACK_EFFECT: {
+		defenceAction: {
+			getWounded: -1,
+		},
+		enemyBroadsideOnMe: {
+			getWounded: 1,
+			noAction: 250,
+		},
+		ENERGY_MIGHTY: {
+			getWounded: 1,
+		},
+		ENERGY_WEAK: {
+			getWounded: -1,
+		}
+	},
 };
