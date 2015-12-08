@@ -30,12 +30,11 @@ var SysFlowControl = cc.Layer.extend({
 			switch(value.role) {
 				case Config.PLAYER : {
 					this.showLayer.easyAttackBegin();
-					break;
+					return;
 				}
 				case Config.ENEMY.category: {
-					console.info(chct.easyAttack[Config.events.EASY_BEGIN]);
 					this.showLayer.enemyEasyBegin();
-					break;
+					return;
 				}
 			}
 			/*
@@ -48,15 +47,15 @@ var SysFlowControl = cc.Layer.extend({
 		var chct = this.statusCalculateLayer.getCharacter(value.role);
 		if (!chct.isHappened(Config.EASY_ATTACK_MODE, Config.events.EASY_READY)) {
 			chct.setActionTime(Config.EASY_ATTACK_MODE, Config.events.EASY_READY, value.time);
+			console.log("EASY READY")
 			switch(value.role) {
 				case Config.PLAYER : {
 					this.showLayer.easyAttackReady();
-					break;
+					return;
 				}
 				case Config.ENEMY.category: {
 					this.showLayer.enemyEasyReady();
-					console.info(chct.easyAttack[Config.events.EASY_READY] - chct.easyAttack[Config.events.EASY_BEGIN]);
-					break;
+					return;
 				}
 			}
 		}
@@ -70,23 +69,28 @@ var SysFlowControl = cc.Layer.extend({
 					break;
 				}
 				case Config.ENEMY.category: {
-					this.showLayer.enemyEasyEnd();
+					this.showLayer.enemyAttackEnd();
+					chct.AI.setActionTime(chct.getHitTime());
 					break;
 				}
 			}
 			if (!chct.isEnemyPosition(Config.enemyBroadsideOnMe)) {
 				chct.setActionTime(Config.EASY_ATTACK_MODE, Config.events.EASY_GO, value.time);
-				console.info(chct.easyAttack[Config.events.EASY_GO] - chct.easyAttack[Config.events.EASY_READY]);
 				var target = chct.getTarget();
 				var hitTime = chct.getHitTime();
-				target.setActionTime(Config.CHARACTER_STATUS, Config.events.GET_WOUNDED, value.time + hitTime * 1000);
+				var getWoundedTime = value.time + hitTime * 1000;
 				var woundEvent = {
 					from: chct,
 					to: target,
-					time: Date.now(),
+					time: getWoundedTime,
 					attackEnergy: chct.getAttackEnergy(),
 					ATTACK_FLAG: Config.EASY_ATTACK_MODE
 				};
+				console.log("attack go: " + value.time);
+				target.setActionTime(Config.CHARACTER_STATUS, Config.events.GET_WOUNDED, getWoundedTime);
+				// hit action
+				this.showLayer.executeHitAction(chct.getName(), hitTime);
+				// check wound
 				this.scheduleOnce(function() {
 					this.eventCenter.dispatchEvent(Config.events.GET_WOUNDED, woundEvent);
 				}.bind(this), hitTime);
@@ -105,11 +109,11 @@ var SysFlowControl = cc.Layer.extend({
 			switch(value.role) {
 				case Config.PLAYER : {
 					this.showLayer.hardAttackBegin();
-					console.info("HARD BEGIN!!!");
-					break;
+					return;
 				}
 				case Config.ENEMY.category: {
-					break;
+					this.showLayer.enemyHardBegin();
+					return;
 				}
 			}
 
@@ -122,11 +126,11 @@ var SysFlowControl = cc.Layer.extend({
 			switch(value.role) {
 				case Config.PLAYER : {
 					this.showLayer.hardAttackReady();
-					console.info("HARD READY!!!");
-					break;
+					return;
 				}
 				case Config.ENEMY.category: {
-					break;
+					this.showLayer.enemyHardReady();
+					return;
 				}
 			}
 
@@ -141,6 +145,8 @@ var SysFlowControl = cc.Layer.extend({
 					break;
 				}
 				case Config.ENEMY.category: {
+					this.showLayer.enemyAttackEnd();
+					chct.AI.setActionTime(chct.getHitTime());
 					break;
 				}
 			}
@@ -148,14 +154,15 @@ var SysFlowControl = cc.Layer.extend({
 				chct.setActionTime(Config.HARD_ATTACK_MODE, Config.events.HARD_GO, value.time);
 				var target = chct.getTarget();
 				var hitTime = chct.getHitTime();
-				target.setActionTime(Config.CHARACTER_STATUS, Config.events.GET_WOUNDED, value.time + hitTime * 1000);
+				var getWoundedTime = value.time + hitTime * 1000;
 				var woundEvent = {
 					from: chct,
 					to: target,
-					time: Date.now(),
+					time: getWoundedTime,
 					attackEnergy: chct.getAttackEnergy(),
 					ATTACK_FLAG: Config.HARD_ATTACK_MODE
 				};
+				target.setActionTime(Config.CHARACTER_STATUS, Config.events.GET_WOUNDED, getWoundedTime);
 				this.scheduleOnce(function() {
 					this.eventCenter.dispatchEvent(Config.events.GET_WOUNDED, woundEvent);
 				}.bind(this), hitTime);
@@ -181,18 +188,19 @@ var SysFlowControl = cc.Layer.extend({
 	 * below is the related position action control function
 	 *
 	 */
-	moveAsideBegin: function(value/*role, time*/) {
+	moveAsideBegin: function(value/*role, time, FLAG*/) {
 		var chct = this.statusCalculateLayer.getCharacter(value.role);
 		chct.setActionTime(Config.ADJUST_POSITION, Config.events.MOVE_ASIDE_BEGIN, value.time);
 		chct.getTarget().setEnemyMoving(0);
-		console.info("move aside");
+		console.info("move aside time: " + value.time);
 	},
 	moveAsideEnd: function(value/*role, time, FLAG*/) {
 		var chct = this.statusCalculateLayer.getCharacter(value.role);
 		chct.setActionTime(Config.ADJUST_POSITION, Config.events.MOVE_ASIDE_END, value.time);
-		if (chct.isSatisfiedMoveTime(value.FLAG)) {
+		if (chct.isSatisfiedMoveTime(value.FLAG) || chct.isHappened(Config.ADJUST_POSITION, Config.events.OPERATE_ADJUST)) {
 			chct.getTarget().setEnemyMoving(1);
 			chct.checkPosition(Config.events.MOVE_ASIDE_END);
+			console.info("MOVE ASIDE SUCCEED!!! " + value.time);
 		}
 	},
 	moveForwardBegin: function(value/*role, time*/) {
@@ -204,7 +212,7 @@ var SysFlowControl = cc.Layer.extend({
 	moveForwardEnd: function(value/*role, time, FLAG*/) {
 		var chct = this.statusCalculateLayer.getCharacter(value.role);
 		chct.setActionTime(Config.ADJUST_POSITION, Config.events.MOVE_FORWARD_END, value.time);
-		if (chct.isSatisfiedMoveTime(value.FLAG)) {
+		if (chct.isSatisfiedMoveTime(value.FLAG) || chct.isHappened(Config.ADJUST_POSITION, Config.events.OPERATE_ADJUST)) {
 			chct.getTarget().setEnemyMoving(1);
 			console.info("MOVE FORWARD SUCCEED!!!");
 			chct.checkPosition();
@@ -219,7 +227,7 @@ var SysFlowControl = cc.Layer.extend({
 	moveBackwardEnd: function(value/*role, time, FLAG*/) {
 		var chct = this.statusCalculateLayer.getCharacter(value.role);
 		chct.setActionTime(Config.ADJUST_POSITION, Config.events.MOVE_BACKWARD_END, value.time);
-		if (chct.isSatisfiedMoveTime(value.FLAG)) {
+		if (chct.isSatisfiedMoveTime(value.FLAG) || chct.isHappened(Config.ADJUST_POSITION, Config.events.OPERATE_ADJUST)) {
 			chct.getTarget().setEnemyMoving(1);
 			console.info("MOVE BACKWARD SUCCEED!!!");
 			chct.checkPosition();
@@ -234,17 +242,17 @@ var SysFlowControl = cc.Layer.extend({
 		};
 		this.eventCenter.dispatchEvent(Config.events.OPERATE_ADJUST, adjustEvent);
 		if (chct.isInAdjustWindow()) {
+			console.info(chct.getName() + " adjust position!!!");
 			if (chct.getNoActionTime() <= 0) {
 				if (chct.isHappened(Config.EASY_ATTACK_MODE, Config.events.EASY_BEGIN)) {
 					var easyEvent = {
 						role: value.role,
 						time: value.time
 					};
-					chct.setActionTime(Config.EASY_ATTACK_MODE, Config.events.EASY_READY, easyEvent);
+					this.eventCenter.dispatchEvent(Config.events.EASY_READY, easyEvent);
 					switch(value.role) {
 						case Config.PLAYER : {
 							this.showLayer.attackFlashReady(Config.EASY_ATTACK_MODE);
-
 							break;
 						}
 						case Config.ENEMY.category: {
@@ -258,11 +266,10 @@ var SysFlowControl = cc.Layer.extend({
 						role: value.role,
 						time: value.time
 					};
-					chct.setActionTime(Config.HARD_ATTACK_MODE, Config.events.HARD_READY, hardEvent);
+					this.eventCenter.dispatchEvent(Config.events.HARD_READY, hardEvent);
 					switch(value.role) {
 						case Config.PLAYER : {
 							this.showLayer.attackFlashReady(Config.HARD_ATTACK_MODE);
-
 							break;
 						}
 						case Config.ENEMY.category: {
@@ -271,8 +278,8 @@ var SysFlowControl = cc.Layer.extend({
 					}
 					chct.setAdjustWindow();
 				} else
-				if (value.FLAG !== null && chct.isEnemyPosition(Config.enemyFacedToMe) && !chct.isHappened(Config.ADJUST_POSITION, Config.events.MOVE_ASIDE_BEGIN)) {
-					console.log(value.FLAG !== null);
+				if (chct.isEnemyPosition(Config.enemyFacedToMe) && !chct.isHappened(Config.ADJUST_POSITION, Config.events.MOVE_ASIDE_BEGIN) && value.FLAG != null) {
+					//console.error("null action happen " + (value.FLAG == null));
 					var positionBeginEvent = {
 						role: value.role,
 						time: value.time
@@ -281,7 +288,6 @@ var SysFlowControl = cc.Layer.extend({
 					switch(value.role) {
 						case Config.PLAYER : {
 							this.showLayer.showFlashPosition(value.FLAG);
-
 							break;
 						}
 						case Config.ENEMY.category: {
@@ -303,7 +309,8 @@ var SysFlowControl = cc.Layer.extend({
 						role: value.role,
 						time: value.time
 					};
-					this.eventCenter.dispatchEvent(Config.events.ADJUST_TO_FACE, turnEvent)
+					this.eventCenter.dispatchEvent(Config.events.ADJUST_TO_FACE, turnEvent);
+					chct.setAdjustWindow();
 				}
 			} else {
 				var noActionEvent = {
@@ -314,7 +321,7 @@ var SysFlowControl = cc.Layer.extend({
 			}
 		}
 	},
-	adjust2Face: function(value/*role, time*/) {
+	adjustToFace: function(value/*role, time*/) {
 		var chct = this.statusCalculateLayer.getCharacter(value.role);
 		chct.checkPosition(Config.events.ADJUST_TO_FACE);
 		/*
@@ -368,16 +375,18 @@ var SysFlowControl = cc.Layer.extend({
 					this.showLayer.noPosition();
 				}
 				this._playerNoActionGo(listener, replacement);
-				chct.cleanMoveDirection();
 				break;
 			}
 			case Config.ENEMY.category: {
 				this.showLayer.enemyNoActionGo();
+				chct.AI.clearAction();
 				break;
 			}
 		}
+		chct.cleanMoveDirection();
+		chct.attackEnded();
 		this.eventCenter.dispatchEvent(Config.events.POSITION_END, {role: value.character, time: Date.now()});
-		console.info(value.character + " NO ACTION!!!");
+		//console.info(value.character + " NO ACTION!!! " + "time: " + Date.now());
 	},
 	_playerNoActionGo: function(listener, noAction) {
 		var showLayer = this.showLayer;
@@ -386,6 +395,8 @@ var SysFlowControl = cc.Layer.extend({
 				cc.callFunc(function() {
 					cc.eventManager.pauseTarget(this.attackButton);
 					cc.eventManager.pauseTarget(this.defenceButton);
+					cc.eventManager.pauseTarget(this.positionButton);
+					/*
 					if (listener != null) {
 						cc.eventManager.removeListener(listener);
 						//console.log(listener.isEnabled());
@@ -394,6 +405,7 @@ var SysFlowControl = cc.Layer.extend({
 					} else {
 						cc.eventManager.pauseTarget(this.positionButton);
 					}
+					*/
 					this.noAttack();
 					this.noDefence();
 				}.bind(showLayer)),
@@ -426,7 +438,7 @@ var SysFlowControl = cc.Layer.extend({
 					break;
 				}
 			}
-			console.log("resume");
+			//console.info(value.character + " resume!!! " + "time: " + Date.now());
 		}
 		chct.setNoActionFlag(false);
 
@@ -440,12 +452,15 @@ var SysFlowControl = cc.Layer.extend({
 			showLayer.noActionPlayer.setTarget(null);
 			cc.eventManager.resumeTarget(showLayer.attackButton);
 			cc.eventManager.resumeTarget(showLayer.defenceButton);
+			cc.eventManager.resumeTarget(showLayer.positionButton);
+			/*
 			if (listener == null) {
 				cc.eventManager.resumeTarget(showLayer.positionButton);
 			} else {
 				cc.eventManager.removeListener(listener);
 				cc.eventManager.addListener(position, showLayer.positionButton);
 			}
+			*/
 			showLayer.doAttack();
 			showLayer.doDefence();
 			showLayer.doPosition();
@@ -470,55 +485,64 @@ var SysFlowControl = cc.Layer.extend({
 					break;
 				}
 				case Config.ENEMY.category: {
+					this.showLayer.enemyDefenceBegin();
+					console.log("enemy defence begin");
 					break;
 				}
 			}
 
 		}
 	},
-	defenceEnd: function(value/*role, time*/) {
+	defenceEnd: function(value/*role, time, FLAG*/) {
 		var chct = this.statusCalculateLayer.getCharacter(value.role);
 		var event = Config.events.DEFENCE_END;
 		if (!chct.isDefenceEnded()) {
 			chct.setActionTime(Config.DEFENCE_ACTION, event, value.time);
 			chct.setDefenceDuration(event);
-			switch(value.role) {
-				case Config.PLAYER : {
-					this.showLayer.defenceAction(event, chct.calcDefenceEndTime(chct.getDefenceDuration()) / 1000);
-					console.info("DEFENCE END!!!");
-					break;
-				}
-				case Config.ENEMY.category: {
-					break;
-				}
+			if (value.role == Config.ENEMY.category) {
+				this.showLayer.resetEnemyDefence();
+				chct.AI.closeDefence();
+				console.info("enemy defence end");
 			}
-
+		}
+		if (value.role == Config.PLAYER && value.FLAG == Config.OPERATE_EVENT) {
+			this.showLayer.defenceAction(event, chct.calcDefenceEndTime(chct.getDefenceDuration()) / 1000);
+			console.info("DEFENCE END!!!");
 		}
 	},
 	blockBegin: function(value/*role, time*/) {
 		var chct = this.statusCalculateLayer.getCharacter(value.role);
 		if (chct.isBlockReady(value.time)) {
-			switch(value.role) {
-				case Config.PLAYER : {
-					this.showLayer.blockBegin();
-					console.info("BLOCK BEGIN!!!");
-
-					break;
-				}
-				case Config.ENEMY.category: {
-					break;
-				}
-			}
+			this.showLayer.blockBegin(value.role);
+			console.log("enemy BLOCK begin at: " + value.time);
 			chct.setActionTime(Config.DEFENCE_ACTION, Config.events.BLOCK_BEGIN, value.time);
 			chct.checkBlock(value.time);
 		}
 	},
-	blockFail: function(value/*role, time*/) {
-
+	blockFail: function(value/*role, noAction*/) {
+		var chct = this.statusCalculateLayer.getCharacter(value.role);
+		chct.setNoActionTime(value.noAction);
+		if (value.role == Config.ENEMY.category) {
+			this.showLayer.blockEnd(value.role);
+			var endEvent = {
+				role: chct.getName(),
+				time: Date.now()
+			};
+			this.eventCenter.dispatchEvent(Config.events.DEFENCE_END, endEvent);
+		}
 	},
 	blockGo: function(value/*role, noAction*/) {
-		var chct = value.role;
-		chct.setNoActionTime(value.noAction);
+		var chct = this.statusCalculateLayer.getCharacter(value.role);
+		var target = chct.getTarget();
+		target.attackEnded();
+		target.setNoActionTime(value.noAction);
+		if (chct.getName() == Config.ENEMY.category) {
+			var endEvent = {
+				role: chct.getName(),
+				time: Date.now()
+			};
+			this.eventCenter.dispatchEvent(Config.events.DEFENCE_END, endEvent);
+		}
 		console.info("BLOCK SUCCEED!!!");
 	},
 	/**
@@ -537,6 +561,9 @@ var SysFlowControl = cc.Layer.extend({
 		var chct = this.statusCalculateLayer.getCharacter(value.role);
 		if(!chct.isOperateEnergyEnded()) {
 			chct.setActionTime(Config.OPERATE_ENERGY, Config.events.OPERATE_ENERGY_END, value.time);
+			chct.setAttackEnergy(chct.getEnergyIndex());
+			this.showLayer.setAttackEnergyIndex(chct.getName(), chct.getAttackEnergy());
+			this.showLayer.setAttackEnergyTexture(chct.getName(), chct.getAttackEnergy());
 			console.info("OPERATE ENERGY END!!!");
 		}
 	},
@@ -553,10 +580,22 @@ var SysFlowControl = cc.Layer.extend({
 		player.setEnergyBeginTime(playerIndex, value.time);
 		enemy.setEnergyBeginTime(enemyIndex, value.time);
 
-		// init easyUp and hardUp
+		// init attack elements
+		showLayer.setAttackEnergyIndex(player.getName(), playerIndex);
+		showLayer.setAttackEnergyIndex(enemy.getName(), enemyIndex);
+		showLayer.setAttackEnergyTexture(player.getName(), player.getAttackEnergy());
+		showLayer.setAttackEnergyTexture(enemy.getName(), enemy.getAttackEnergy());
 		var easyTime = player.getEasyTime();
 		var hardTime = player.getHardTime();
 		this.showLayer.initAttackMovement(easyTime, hardTime);
+
+		// init the energy number
+		showLayer.Energy[Config.PLAYER].forEach(function(e, i) {
+			e.setString(player.singleEnergy[i][Config.ENERGY_QUANTITY]);
+		});
+		showLayer.Energy[Config.ENEMY.category].forEach(function(e, i) {
+			e.setString(enemy.singleEnergy[i][Config.ENERGY_QUANTITY]);
+		});
 
 		// init position label
 		this.eventCenter.dispatchEvent(Config.events.SET_POSITION_LABEL);
@@ -572,7 +611,7 @@ var SysFlowControl = cc.Layer.extend({
 		 * 	TODO
 		 * 	is it beautiful enough to start schedule action in here?
 		 */
-		showLayer.optimizedSchedule(showLayer.energyRotation, showLayer.frameTime);
+		//showLayer.optimizedSchedule(showLayer.energyRotation, showLayer.frameTime);
 		console.log("ENERGY BEGIN!!");
 	},
 	energyDurationBegin: function(value/*role, lastIndex, index, time*/) {
@@ -581,9 +620,11 @@ var SysFlowControl = cc.Layer.extend({
 			var nextIndex = (value.index + 1) % Config.ENERGY_LENGTH;
 			chct.setEnergyIndex(nextIndex);
 			chct.setEnergyBeginTime(nextIndex, value.time);
+			/*
 			if (chct.isOperateEnergyBegan() && !chct.isOperateEnergyEnded()) {
 				chct.setAttackEnergy(nextIndex);
 			}
+			*/
 			switch(value.role) {
 				case Config.PLAYER : {
 					this.showLayer.nextEnergyRotation(nextIndex, Config.LEFT_SERIES);
@@ -628,6 +669,7 @@ var SysFlowControl = cc.Layer.extend({
 	setPositionLabel: function() {
 		// called in init showLayer;
 		var chct = this.statusCalculateLayer.getCharacter(Config.PLAYER);
+		//console.log(chct.getName() + " set position label");
 		this.showLayer.setPositionLabel(chct.getPositionLabel());
 	},
 	onEnter: function() {

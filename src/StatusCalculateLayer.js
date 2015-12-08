@@ -30,23 +30,24 @@ var StatusCalculateLayer = cc.Layer.extend({
 		this.addChild(enemy);
 	},
 
-	/**
-	 * TODO
-	 * how to init the character in one scene
-	 */
 	onEnter: function() {
 		this._super();
 		this.showLayer = this.getParent().getChildByName(Config.SHOW_LAYER);
 
 		var player = this.getChildByName(Config.PLAYER);
 		var enemy = this.getChildByName(Config.ENEMY.category);
-		player.setEnemy(enemy, Config.enemyBroadsideOnMe);
+		player.setEnemy(enemy, Config.enemyFacedToMe);
 		player.setTarget(enemy);
-		enemy.setEnemy(player, Config.broadsideOnEnemy);
+		enemy.setEnemy(player, Config.enemyFacedToMe);
 		enemy.setTarget(player);
-		var enemyMind = new EnemyAi(enemy, 1, this.getParent().eventCenter);
-		this.addChild(enemyMind);
-	}
+		var enemyAi = new EnemyAi(enemy, 0.3, this.getParent().eventCenter, this.showLayer);
+		enemy.AI = enemyAi;
+		enemy.addChild(enemyAi);
+	},
+
+	showEndPanel: function(FLAG) {
+		var panel
+	},
 });
 
 var Fighter = cc.Node.extend({
@@ -88,6 +89,8 @@ var Fighter = cc.Node.extend({
 		this.enemies = this.data.enemies;
 		this.action = this.data.action;
 		this.attackEffect = this.data.attackEffect;
+
+		this.action.defenceDuration = this.status.maxDefenceTime;
 
 		this.showLayer = this.getParent().getParent().getChildByName(Config.SHOW_LAYER);
 		this.eventCenter = this.getParent().getParent().eventCenter;
@@ -157,6 +160,7 @@ var Fighter = cc.Node.extend({
 			}
 			var energy = this.getEnergy(myIndex) - wound;
 			this.setEnergy(myIndex, energy);
+			//console.info("check wound time: " + Date.now());
 			this.setNoActionTime(noAction);
 			var labelEvent = {
 				FLAG: this.getName(),
@@ -165,6 +169,7 @@ var Fighter = cc.Node.extend({
 			};
 			this.eventCenter.dispatchEvent(Config.events.SET_ENERGY_LABEL, labelEvent);
 		}
+		this.attackEnded();
 	},
 	/**
 	 * position action function
@@ -184,25 +189,26 @@ var Fighter = cc.Node.extend({
 	adjustPositionGo: function() {
 	},
 	setAdjustWindow: function() {
-		this.status.adjustPositionWindow = this.action.adjustWindow;
-		console.info(this.getName() + " ADJUST GO!!!");
+		this.status.adjustCoolWindow = this.action.adjustWindow;
+		console.log("cool window time:" + this.status.adjustCoolWindow);
 	},
 	isInAdjustWindow: function() {
-		return this.status.adjustPositionWindow <= 0;
+		return this.status.adjustCoolWindow <= 0;
 	},
 	isSatisfiedMoveTime: function(FLAG) {
+		//console.log(this.action.adjustTime);
 		switch(FLAG) {
 			case Config.LEFT_SERIES : {
-				return this.adjustPosition[Config.events.MOVE_ASIDE_END] - this.adjustPosition[Config.events.MOVE_ASIDE_BEGIN] >= this.action.adjustTime;
+				return this.adjustPosition[Config.events.MOVE_ASIDE_END] - this.adjustPosition[Config.events.MOVE_ASIDE_BEGIN] >= this.action.adjustTime * 1000;
 			}
 			case Config.RIGHT_SERIES: {
-				return this.adjustPosition[Config.events.MOVE_ASIDE_END] - this.adjustPosition[Config.events.MOVE_ASIDE_BEGIN] >= this.action.adjustTime;
+				return this.adjustPosition[Config.events.MOVE_ASIDE_END] - this.adjustPosition[Config.events.MOVE_ASIDE_BEGIN] >= this.action.adjustTime * 1000;
 			}
 			case Config.MOVE_FORWARD: {
-				return this.adjustPosition[Config.events.MOVE_FORWARD_END] - this.adjustPosition[Config.events.MOVE_FORWARD_BEGIN] >= this.action.adjustTime;
+				return this.adjustPosition[Config.events.MOVE_FORWARD_END] - this.adjustPosition[Config.events.MOVE_FORWARD_BEGIN] >= this.action.adjustTime * 1000;
 			}
 			case Config.MOVE_BACKWARD: {
-				return this.adjustPosition[Config.events.MOVE_BACKWARD_END] - this.adjustPosition[Config.events.MOVE_BACKWARD_BEGIN] >= this.action.adjustTime;
+				return this.adjustPosition[Config.events.MOVE_BACKWARD_END] - this.adjustPosition[Config.events.MOVE_BACKWARD_BEGIN] >= this.action.adjustTime * 1000;
 			}
 		}
 	},
@@ -225,7 +231,7 @@ var Fighter = cc.Node.extend({
 		switch (FLAG) {
 			case Config.events.DEFENCE_BEGIN: {
 				if (beginTime != null && endTime != null) {
-					this.action.defenceDuration = Math.min(beginTime - endTime + this.getDefenceDuration(), this.action.maxDefenceTime);
+					this.action.defenceDuration = Math.min(beginTime - endTime + this.getDefenceDuration(), this.status.maxDefenceTime);
 				}
 				break;
 			}
@@ -246,30 +252,51 @@ var Fighter = cc.Node.extend({
 	 	return this.status.getWounded - this.action.blockWindow;
 	},
 	calcDefenceEndTime: function(time) {
-		return this.action.maxDefenceTime - time;
+		return this.status.maxDefenceTime - time;
+	},
+	checkDefence: function(nowTime) {
+		var beginTime = this.defenceAction[Config.events.DEFENCE_BEGIN];
+		if (beginTime != null && !this.isDefenceEnded() && nowTime - beginTime >= this.status.maxDefenceTime) {
+			var endEvent = {
+				role: this.getName(),
+				time: nowTime
+			};
+			this.eventCenter.dispatchEvent(Config.events.DEFENCE_END, endEvent);
+			console.log(this.getName() + " defence auto end");
+		}
 	},
 	checkBlock: function(time) {
+		console.info("block info begin: " + this.getBlockWindowBegin() + " now: " + time + " end: " + this.status.getWounded);
+		var blockEvent;
 		if (this.isAttacked()) {
-			var blockEvent;
 			if (this.getBlockWindowBegin() < time && time < this.status.getWounded) {
 				this.setActionTime(Config.CHARACTER_STATUS, Config.events.GET_WOUNDED, 0);
 				blockEvent = {
-					role: this.getTarget(),
-					noAction: this.action.blockBonus,
+					role: this.getName(),
+					noAction: this.getTarget().action.blockBonus,
 				};
+				console.log(blockEvent.noAction);
 				this.eventCenter.dispatchEvent(Config.events.BLOCK_GO, blockEvent);
 			} else {
 				/*
 				 * here could be the fail block action
 				 */
-				this.setNoActionTime(this.action.blockPunishment);
+				blockEvent = {
+					role: this.getName(),
+					noAction: this.action.blockPunishment,
+				};
+				this.eventCenter.dispatchEvent(Config.events.BLOCK_FAIL, blockEvent);
 				console.error("BLOCK FAIL!!!");
 			}
 		} else {
 			/*
 			 * here could be the shield attack action
 			 */
-			this.setNoActionTime(this.action.blockPunishment);
+			blockEvent = {
+				role: this.getName(),
+				noAction: this.action.blockPunishment,
+			};
+			this.eventCenter.dispatchEvent(Config.events.BLOCK_FAIL, blockEvent);
 			console.info("CAN SHIELD ATTACK!!!");
 		}
 		this.eventCenter.dispatchEvent(Config.events.DEFENCE_END, {role: Config.PLAYER, time: Date.now()});
@@ -370,10 +397,10 @@ var Fighter = cc.Node.extend({
 	setNoActionTime: function(time) {
 		var wholeTime = this.getNoActionTime() + time;
 		var FLAG;
-		if (wholeTime <= this.action.maxNoActionTime) {
+		if (wholeTime <= this.status.maxNoActionTime) {
 			this.status.noAction = wholeTime;
 		} else {
-			this.status.noAction = this.action.maxNoActionTime;
+			this.status.noAction = this.status.maxNoActionTime;
 		}
 		if (this.isInAdjustWindow()) {
 			FLAG = Config.ADJUST_POSITION;
@@ -382,6 +409,7 @@ var Fighter = cc.Node.extend({
 			character: this.getName(),
 			FLAG: FLAG
 		};
+		//console.log("name: %s, no action time: %d", this.getName(), this.status.noAction);
 		this.eventCenter.dispatchEvent(Config.events.NO_ACTION_GO, noActionEvent);
 	},
 	getNoActionTime: function() {
@@ -463,14 +491,14 @@ var Fighter = cc.Node.extend({
 		if ((this.isEnemyPosition(Config.enemyBroadsideOnMe) || this.isEnemyPosition(Config.broadsideOnEnemy)) && FLAG == Config.events.ADJUST_TO_FACE ) {
 			this.setEnemy(this.getTarget(), Config.enemyFacedToMe);
 			this.getTarget().setEnemy(this, Config.enemyFacedToMe);
-			console.log("ENEMY FACED TO ME!!!");
+			//console.log("ENEMY FACED TO ME!!!");
 		}
 		this.cleanMoveDirection();
 		this.eventCenter.dispatchEvent(Config.events.SET_POSITION_LABEL, this.getName());
 	},
 	checkStatus: function() {
 		if (this.status.noAction > 0) {
-			this.status.noAction -= 1;
+			this.status.noAction -= 20;
 		} else
 		if (this.status.noAction <= 0) {
 			var noActionEvent = {
@@ -478,9 +506,10 @@ var Fighter = cc.Node.extend({
 			};
 			this.eventCenter.dispatchEvent(Config.events.NO_ACTION_STOP, noActionEvent);
 		}
-		if (this.status.adjustPositionWindow > 0) {
-			this.status.adjustPositionWindow -= 5;
+		if (this.status.adjustCoolWindow > 0) {
+			this.status.adjustCoolWindow -= 20;
 		}
+		this.checkDefence(Date.now());
 	},
 	optimizedSchedule: function(callback, interval) {
 		var then = Date.now();

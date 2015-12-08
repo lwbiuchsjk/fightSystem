@@ -37,6 +37,11 @@ var ShowLayer = cc.Layer.extend({
     //the noAction status of enemy
     actionStatus: null,
 
+    playerHitMask: null,
+    playerHitStencil: null,
+    enemyHitMask: null,
+    enemyHitStencil: null,
+
     attackEasyUp: null,
     attackHardUp: null,
     positionMovement: null,
@@ -45,8 +50,11 @@ var ShowLayer = cc.Layer.extend({
     defenceProgressIn: null,
 
     sysControlLayer: null,
+
     playerEnergyIndex: null,
+    playerAttackEnergy: null,
     enemyEnergyIndex: null,
+    enemyAttackEnergy: null,
 
     noActionPlayer: null,
     noActionEnemy: null,
@@ -95,13 +103,15 @@ var ShowLayer = cc.Layer.extend({
         if (!this.easyButton.getParent() && !this.hardButton.getParent()) {
             this.addChild(this.easyButton, 1, Config.EASY_ATTACK_MODE);//, 1, "easy");
             this.addChild(this.hardButton, 1, Config.HARD_ATTACK_MODE);//, 1, "easy");
+            this.easyButton.setTexture(res["easy" + this.playerAttackEnergy]);
+            this.hardButton.setTexture(res["hard" + this.playerAttackEnergy]);
         }
     },
     easyAttackReady: function() {
         this.easyButton.setTexture(res.easyGo);
     },
     easyAttackBegin: function() {
-        this.easyButton.setTexture(res.easyAttack);
+       // this.easyButton.setTexture(res.easyAttack);
         this.hardButton.setTexture(res.hardNo);
         var attackProgress = this.attackProgress;
         var upAction = this.attackEasyUp;
@@ -113,7 +123,7 @@ var ShowLayer = cc.Layer.extend({
         this.hardButton.setTexture(res.hardGo);
     },
     hardAttackBegin: function() {
-        this.hardButton.setTexture(res.hardAttack);
+        //this.hardButton.setTexture(res.hardAttack);
         this.easyButton.setTexture(res.easyNo);
         var attackProgress = this.attackProgress;
         var upAction = this.attackHardUp;
@@ -141,16 +151,73 @@ var ShowLayer = cc.Layer.extend({
         this.attackProgress.y = this.attackButton.y + Config.ATTACK_PROGRESS_Y;
     },
     enemyEasyBegin: function() {
-        this.attackStatus.setTexture(res.easyAttack);
+        this.attackStatus.setTexture(res["easy" + this.enemyAttackEnergy]);
         this.attackStatus.scaleX = 0.5;
     },
     enemyEasyReady: function() {
         this.attackStatus.setTexture(res.easyGo);
+        console.log("Ready");
         this.attackStatus.scaleX = 0.5;
     },
-    enemyEasyEnd: function() {
-        this.attackStatus.setTexture(res.attack);
+    enemyHardBegin: function() {
+        this.attackStatus.setTexture(res["hard" + this.enemyAttackEnergy]);
+        this.attackStatus.scaleX = 0.5;
+    },
+    enemyHardReady: function() {
+        this.attackStatus.setTexture(res.hardGo);
+        this.attackStatus.scaleX = 0.5;
+    },
+    enemyAttackEnd: function() {
+        this.setAttackEnergyTexture(Config.ENEMY.category, this.enemyAttackEnergy);
         this.attackStatus.scaleX = 1;
+    },
+    setAttackEnergyTexture: function(FLAG, index) {
+        var sprite, texture;
+        switch (FLAG) {
+            case Config.PLAYER: {
+                sprite = this.attackButton;
+                texture = res["attack" + index];
+                break;
+            }
+            case Config.ENEMY.category: {
+                sprite = this.attackStatus;
+                texture = res["attack" + index];
+            }
+        }
+        sprite.setTexture(texture);
+    },
+    setAttackEnergyIndex: function(FLAG, index) {
+        this[FLAG + "AttackEnergy"] = index;
+    },
+    executeHitAction: function(FLAG, time) {
+        var startY, endY;
+        switch(FLAG) {
+            case Config.PLAYER: {
+                startY = Config.CENTER_Y + Config.ME_HIT_START_Y;
+                endY = Config.CENTER_Y + Config.ME_HIT_END_Y;
+                break;
+            }
+            case Config.ENEMY.category: {
+                startY = Config.CENTER_Y + Config.ENEMY_HIT_START_Y;
+                endY = Config.CENTER_Y + Config.ENEMY_HIT_END_Y;
+                break;
+            }
+        }
+        var mask = this[FLAG + "HitMask"];
+        var stencil = this[FLAG + "HitStencil"];
+        if (mask.getParent() == null) {
+            this.addChild(mask);
+            var hitAction = cc.sequence(
+                cc.moveTo(time - 0.05, cc.p(stencil.x, endY)),
+                cc.callFunc(function() {
+                    if (mask.getParent() != null) {
+                        stencil.y = startY;
+                        mask.removeFromParent();
+                    }
+                }, this)
+            );
+            stencil.runAction(hitAction);
+        }
     },
     /**
      * @param {string} FLAG
@@ -193,7 +260,7 @@ var ShowLayer = cc.Layer.extend({
         this.attackEnded();
     },
     doAttack: function() {
-        this.attackButton.setTexture(res.attack);
+        this.setAttackEnergyTexture(Config.PLAYER, this.playerAttackEnergy);
     },
 
     /**
@@ -244,8 +311,7 @@ var ShowLayer = cc.Layer.extend({
     },
     showFlashPosition: function(FLAG) {
         var img = this.moveButtons[FLAG];
-        console.log(img);
-        if (img.getParent() == null) {
+        if (img != null && img.getParent() == null) {
             this.addChild(img);
         }
         this.resetPositionProgress();
@@ -297,6 +363,33 @@ var ShowLayer = cc.Layer.extend({
             }
         }
     },
+    /**
+     * the function is used by ENEMY AI. when the enemy is moving, he will use this function to change the position status, and imply the player "I will move"
+     * the FLAG must be the Config events that is related to move action. the detail is below.
+     * @param FLAG
+     */
+    setPositionStatusTexture: function(FLAG) {
+        var texture;
+        switch(FLAG) {
+            case Config.LEFT_SERIES: {
+                texture = res.slide;
+                break;
+            }
+            case Config.RIGHT_SERIES: {
+                texture = res.slide;
+                break;
+            }
+            case Config.MOVE_BACKWARD: {
+                texture = res.backward;
+                break;
+            }
+            case Config.MOVE_FORWARD: {
+                texture = res.forward;
+                break;
+            }
+        }
+        this.positionStatus.setTexture(texture);
+    },
 
     /**
      *
@@ -335,16 +428,48 @@ var ShowLayer = cc.Layer.extend({
             }
         }
     },
-    blockBegin: function() {
-        var block = this.blockSprite;
-        if (block.getParent() == null) {
-            this.addChild(block);
+    enemyDefenceBegin: function() {
+        this.defenceStatus.setTexture(res.defence);
+    },
+    resetEnemyDefence: function() {
+        this.defenceStatus.setTexture(res.noDefence);
+    },
+    /**
+     * show layer will show the block action element with this function. the character is used to distingush player and AI.
+     * @param character
+     */
+    blockBegin: function(character) {
+        var block;
+        switch(character) {
+            case Config.PLAYER: {
+                block = this.blockSprite;
+                if (block.getParent() == null) {
+                    this.addChild(block);
+                }
+                return;
+            }
+            case Config.ENEMY.category: {
+                block = this.defenceStatus;
+                block.setTexture(res.block);
+                return;
+            }
         }
     },
-    blockEnd: function() {
-        var block = this.blockSprite;
-        if (block.getParent()) {
-           block.removeFromParent();
+    blockEnd: function(character) {
+        var block;
+        switch(character) {
+            case Config.PLAYER: {
+                block = this.blockSprite;
+                if (block.getParent()) {
+                    block.removeFromParent();
+                }
+                return;
+            }
+            case Config.ENEMY.category: {
+                block = this.defenceStatus;
+                block.setTexture(res.defence);
+                return;
+            }
         }
     },
 
@@ -418,7 +543,6 @@ var ShowLayer = cc.Layer.extend({
     onEnter: function() {
         this._super();
         this.eventCenter = this.getParent().eventCenter;
-        console.log(this.positionButton);
         this.scheduleOnce(function() {
             this.eventCenter.dispatchEvent(Config.events.INIT_SHOW_LAYER, {time: Date.now()});
         }.bind(this));
@@ -427,18 +551,20 @@ var ShowLayer = cc.Layer.extend({
      * status action function
      */
     setPositionLabel: function(label) {
+        //console.log(label);
         this.positionStatus.setTexture(res[label]);
     },
     enemyNoActionGo: function() {
         this.actionStatus.setTexture(res.noActionGo);
-        this.enemyEasyEnd();
+        this.enemyAttackEnd();
         this.attackStatus.setTexture(res.noAttack);
         this.defenceStatus.setTexture(res.noDefence);
     },
     enemyNoActionStop: function() {
         this.actionStatus.setTexture(res.noActionStop);
-        this.attackStatus.setTexture(res.attack);
-        this.defenceStatus.setTexture(res.defence);
+        this.setAttackEnergyTexture(Config.ENEMY.category, this.enemyAttackEnergy);
+        this.resetEnemyDefence();
+        //this.defenceStatus.setTexture(res.defence);
     },
     setComponentEnbaled: function(target, enable) {
         this[target].enable = enable;
@@ -462,7 +588,6 @@ var ShowLayer = cc.Layer.extend({
         position.attr({
             x : Config.CENTER_X,
             y : Config.CENTER_Y + Config.POSITION_Y,
-            enable: true
         });
         this.addChild(position, 1);
 
@@ -491,17 +616,17 @@ var ShowLayer = cc.Layer.extend({
         block.x = defence.x;
         block.y = defence.y + Config.MOVE_BUTTON_Y;
 
-        var attackMe = new cc.Sprite(res.attack);
+        var attackMe = new cc.Sprite(res.noAttack);
         attackMe.x = Config.CENTER_X + Config.ATTACK_X;
         attackMe.y = Config.CENTER_Y + Config.ATTACK_Y;
         this.addChild(attackMe);
 
-        var easyAttack = new cc.Sprite(res.easyAttack);
+        var easyAttack = new cc.Sprite(res.easyNo);
         easyAttack.x = Config.CENTER_X + Config.EASY_X;
         easyAttack.y = Config.CENTER_Y + Config.EASY_Y;
         easyAttack.setName(Config.EASY_ATTACK_MODE);
 
-        var hardAttack = new cc.Sprite(res.hardAttack);
+        var hardAttack = new cc.Sprite(res.hardNo);
         hardAttack.x = Config.CENTER_X + Config.HARD_X;
         hardAttack.y = Config.CENTER_Y + Config.HARD_Y;
         hardAttack.setName(Config.HARD_ATTACK_MODE);
@@ -562,16 +687,14 @@ var ShowLayer = cc.Layer.extend({
         var positionProgress = new cc.Sprite(res.buttonProgress);
         positionProgress.x = position.x + Config.SLIDE_X;
         positionProgress.y = position.y;
-        //this.addChild(positionProgress);
         var positionStencil = new cc.Sprite(res.buttonProgress);
         positionStencil.x = position.x;
         positionStencil.y = position.y;
         var positionProgressMask = new cc.ClippingNode(positionStencil);
         positionProgressMask.addChild(positionProgress);
-        //positionProgressMask.setInverted(true);
         this.addChild(positionProgressMask);
 
-        var attackEnemy = new cc.Sprite(res.attack);
+        var attackEnemy = new cc.Sprite(res.noAttack);
         attackEnemy.x = Config.CENTER_X + Config.ATTACK_ENEMY_X;
         attackEnemy.y = Config.CENTER_Y + Config.ATTACK_ENEMY_Y;
         this.addChild(attackEnemy);
@@ -605,6 +728,32 @@ var ShowLayer = cc.Layer.extend({
         var energyEnemyMask = new cc.ClippingNode(energyEnemyStencil);
         energyEnemyMask.addChild(energyEnemyBar);
         this.addChild(energyEnemyMask);
+
+        var hitMe = new cc.Sprite(res.hitMe);
+        hitMe.attr({
+            x: attackMe.x,
+            y: Config.CENTER_Y + Config.ME_HIT_Y
+        });
+        var hitMeStencil = new cc.Sprite(res.hitMask);
+        hitMeStencil.attr({
+            x: attackMe.x,
+            y: Config.CENTER_Y + Config.ME_HIT_START_Y,
+        });
+        var hitMeMask = new cc.ClippingNode(hitMeStencil);
+        hitMeMask.addChild(hitMe);
+
+        var hitEnemy = new cc.Sprite(res.hitEnemy);
+        hitEnemy.attr({
+            x: attackEnemy.x,
+            y: Config.CENTER_Y + Config.ENEMY_HIT_Y
+        });
+        var hitEnemyStencil = new cc.Sprite(res.hitMask);
+        hitEnemyStencil.attr({
+            x: attackEnemy.x,
+            y: Config.CENTER_Y + Config.ENEMY_HIT_START_Y,
+        });
+        var hitEnemyMask = new cc.ClippingNode(hitEnemyStencil);
+        hitEnemyMask.addChild(hitEnemy);
         
         for (var i = 0; i < Config.ENERGY_LENGTH; i++) {
             var numberMe = new cc.Sprite(res["Rec" + i]);
@@ -617,14 +766,14 @@ var ShowLayer = cc.Layer.extend({
             numberEnemy.y = Config.CENTER_Y + Config.ENERGY_NUMBER_ENEMY_Y;
             this.addChild(numberEnemy);
 
-            var labelMe = new cc.LabelTTF("48", "arial", 80);
+            var labelMe = new cc.LabelTTF("", "arial", 80);
             labelMe.x = numberMe.x;
             labelMe.y = numberMe.y;
             labelMe.setColor(Config.ENERGY_LIGHT_COLORS[i]);
             this.addChild(labelMe);
             this.Energy.player[i] = labelMe;
 
-            var labelEnemy = new cc.LabelTTF("48", "arial", 80);
+            var labelEnemy = new cc.LabelTTF("", "arial", 80);
             labelEnemy.x = numberEnemy.x;
             labelEnemy.y = numberEnemy.y;
             labelEnemy.setColor(Config.ENERGY_LIGHT_COLORS[i]);
@@ -656,6 +805,10 @@ var ShowLayer = cc.Layer.extend({
         this.attackProgress = attackProgress;
         this.positionProgress = positionProgress;
         this.positionMask = positionProgressMask;
+        this.playerHitMask = hitMeMask;
+        this.playerHitStencil = hitMeStencil;
+        this.enemyHitMask = hitEnemyMask;
+        this.enemyHitStencil = hitEnemyStencil;
     },
 });
 

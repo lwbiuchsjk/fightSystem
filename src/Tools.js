@@ -141,7 +141,7 @@ var test = cc.Node.extend({
 		this.unscheduleAllCallbacks();
 		this.schedule(function() {
 			this.count++;
-			if (this.count%10 == 0) {
+			if (this.count % 10 == 0) {
 				this.scheduleOnce(function() {
 					console.log("ok")
 				})
