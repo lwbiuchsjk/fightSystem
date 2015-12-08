@@ -611,7 +611,7 @@ var SysFlowControl = cc.Layer.extend({
 		 * 	TODO
 		 * 	is it beautiful enough to start schedule action in here?
 		 */
-		//showLayer.optimizedSchedule(showLayer.energyRotation, showLayer.frameTime);
+		showLayer.optimizedSchedule(showLayer.energyRotation, showLayer.frameTime);
 		console.log("ENERGY BEGIN!!");
 	},
 	energyDurationBegin: function(value/*role, lastIndex, index, time*/) {
