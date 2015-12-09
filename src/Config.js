@@ -50,18 +50,24 @@ var Config = {
 	ENERGY_NUMBER_ME_Y: -25,
 	ENERGY_NUMBER_INTERVAL: 200,
 	FACE_X: 0,
-	FACE_Y: 250,
+	FACE_Y: 450,				//250,
 	DEFENCE_ENEMY_X: 200,
-	DEFENCE_ENEMY_Y: 450,
+	DEFENCE_ENEMY_Y: 650,		//450,
 	ATTACK_ENEMY_X: -200,
-	ATTACK_ENEMY_Y: 450,
+	ATTACK_ENEMY_Y: 650,		//450,
 	STATUS_ENEMY_X: 0,
-	STATUS_ENEMY_Y: 650,
+	STATUS_ENEMY_Y: 850,		//650,
 	ENERGY_ENEMY_X: -420,
-	ENERGY_ENEMY_Y: 575,
+	ENERGY_ENEMY_Y: 775,		//575,
 	DOT_ENEMY_X: -420,
-	DOT_ENEMY_Y: 375,
-	ENERGY_NUMBER_ENEMY_Y: 850,
+	DOT_ENEMY_Y: 575,			//375,
+	ENERGY_NUMBER_ENEMY_Y: 250, //850
+	ME_HIT_Y: 0,
+	ENEMY_HIT_Y: 313,
+	ME_HIT_START_Y: -170,
+	ME_HIT_END_Y: 150,
+	ENEMY_HIT_START_Y: 550,
+	ENEMY_HIT_END_Y: 75,
 	ATTACK_PROGRESS_X: -170,
 	ATTACK_PROGRESS_Y: -225,
 	SLIDE_X: 300,  	//based on position and the position & move button`s width
@@ -91,8 +97,8 @@ var Config = {
 	/**
 	 * the configs below is about the event message when player operate the button
 	 */
-	LEFT_SERIES: "LEFT",
-	RIGHT_SERIES: "RIGHT",
+	LEFT_SERIES: "left",
+	RIGHT_SERIES: "right",
 
 	EASY_ATTACK_MODE: "easyAttack",
 	HARD_ATTACK_MODE: "hardAttack",
@@ -112,6 +118,24 @@ var Config = {
 	ENERGY_INDEX: "ENERGY_INDEX",
 
 	POSITION_BUTTON: "positionButton",
+
+	OPERATE_EVENT: "operateEvents",
+	AUTO_EVENT: "autoEvent",
+	UP_INSTINCT: "upInstinct",
+	DOWN_INSTINCT: "downInstinct",
+
+	// used in enemy AI to do nothing, if the action has began, and then continue the action
+	DO_CONTINUE: "continue",
+
+	OP_PLUS: "+",
+	OP_SET: "=",
+
+	// when operate energy, use the FLAG to mark the start energy if it is yellow energy, the transmission time will be half.
+	OP_START_ENERGY: "operateStartEnergy",
+
+	RECOVER_DEFENCE: "recoverDefence",			// NO USE
+
+	POSSIBILITY_SCALE: [0, 100],
 
 	/**
 	 * the configs below is about the function name with events
@@ -134,7 +158,7 @@ var Config = {
 		MOVE_BACKWARD_END: "moveBackwardEnd",
 		OPERATE_ADJUST: "operateAdjust",
 		ADJUST_GO: "adjustPositionGo",
-		ADJUST_TO_FACE: "adjust2Face",
+		ADJUST_TO_FACE: "adjustToFace",
 		POSITION_BEGIN: "positionBegin",
 		POSITION_END: "positionEnd",
 
@@ -150,37 +174,11 @@ var Config = {
 		OPERATE_ENERGY_END: "operateEnergyEnd",
 		ENERGY_DURATION_BEGIN: "energyDurationBegin",
 		INIT_SHOW_LAYER: "initShowLayer",
-		//PLAYER_ENERGY_ROTATION: "playerEnergyRotation",
-		//ENEMY_ENERGY_ROTATION: "enemyEnergyRotation",
 		ENERGY_ROTATION_GO: "energyRotationGo",
 
 		NO_ACTION_GO: "noActionGo",
 		NO_ACTION_STOP: "noActionStop",
 		SET_ENERGY_LABEL: "setEnergyLabel",
-	},
-
-	/**
-	 * the action time configuration, unit ms.
-	 */
-	duration: {
-		EASY_BUTTON: 500,
-		HARD_BUTTON: 2000,
-		//if the adjust action duration is less than ADJUST_POSITION_TIME, then we think the player meant to "adjust position", otherwise, we conclude the player meant to move.
-		ADJUST_POSITION_BUTTON: 500,
-		//the max defence time if player do not release his finger
-		DEFENCE_MAX_TIME: 1000,
-		//the energy status duration
-		ENERGY: [5000, 5000, 5000, 5000, 5000],
-		//the duration time that on frame last
-		FRAME_TIME: 20,
-		HIT_TIME: 500,
-		// in the last 250 ms of attack which ends with HIT TIME£¬ the block action will success
-		BLOCK_WINDOW: 250,
-		MAX_NO_ACTON_TIME: 6000,
-		// unit is second
-		NO_ACTION_DELAY_TIME: 100,
-		// when the player click position button to "adjust position", the adjust position window sets the number like below, and the minus with time past. unit ms.
-		ADJUST_POSITION_WINDOW: 5000,
 	},
 
 	/**
@@ -196,33 +194,5 @@ var Config = {
 	PLAYER: "player",
 	ENEMY: {
 		category: "enemy",
-	},
-	/**
-	 * attack effect
-	 * getWounded can be searched by Config.events.GET_WOUNDED,
-	 * noAction can be searched by Config.events.NO_ACTION,
-	 */
-	easyAttack: {
-		getWounded: 2,
-		noAction: 250,
-	},
-	hardAttack: {
-		getWounded: 4,
-		noAction: 500,
-	},
-	ATTACK_EFFECT: {
-		defenceAction: {
-			getWounded: -1,
-		},
-		enemyBroadsideOnMe: {
-			getWounded: 1,
-			noAction: 250,
-		},
-		ENERGY_MIGHTY: {
-			getWounded: 1,
-		},
-		ENERGY_WEAK: {
-			getWounded: -1,
-		}
 	},
 };

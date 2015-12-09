@@ -74,11 +74,12 @@ var OperateLayer = cc.Layer.extend({
 				if (pos.y < easyDownLimit) {
 					// 下面的条件根据easy和hard是否发生进行两类判断，通过传入showLayer.attackEnded的FLAG来决定不同系统流程。功能尚未实现。
 					if (isEasyHappened && !isHardHappened) {
-						//以player的easyAttack的BEGIN时间的时机作为标示,
+						// 以player的easyAttack的BEGIN时间的时机作为标示,
 						player.attackEnded();
 						that.showLayer.attackEnded(Config.EASY_ATTACK_MODE);
-					}else if (!isEasyHappened && isHardHappened){
-						//以player的hardAttack的BEGIN时间的时机作为标示
+					}else
+					if (!isEasyHappened && isHardHappened){
+						// 以player的hardAttack的BEGIN时间的时机作为标示
 						player.attackEnded();
 						that.showLayer.attackEnded(Config.HARD_ATTACK_MODE);
 					}
@@ -98,7 +99,7 @@ var OperateLayer = cc.Layer.extend({
 				that.showLayer.attackEnded();
 				cc.eventManager.resumeTarget(that.showLayer.defenceButton);
 				that.showLayer.doDefence();
-				//player.attackEnded();
+				player.attackEnded();
 
 				return true;
 			}
@@ -155,7 +156,7 @@ var OperateLayer = cc.Layer.extend({
 						};
 						if (!isAdjustPosition && !isOperateAdjust) {
 							that.showLayer.adjustPositionEnded(FLAG);
-							that.showLayer.setPositionProgressDirection(FLAG, player.getMoveDirectionTime());
+							that.showLayer.setPositionProgressDirection(FLAG, player.getMoveDirectionTime(FLAG));
 							eventCenter.dispatchEvent(Config.events.MOVE_ASIDE_BEGIN, positionEvent);
 						} else {
 							that.showLayer.resetPositionProgress();
@@ -172,7 +173,7 @@ var OperateLayer = cc.Layer.extend({
 						};
 						if (!isAdjustPosition && !isOperateAdjust) {
 							that.showLayer.adjustPositionEnded(FLAG);
-							that.showLayer.setPositionProgressDirection(FLAG, player.getMoveDirectionTime());
+							that.showLayer.setPositionProgressDirection(FLAG, player.getMoveDirectionTime(FLAG));
 							eventCenter.dispatchEvent(Config.events.MOVE_ASIDE_BEGIN, positionEvent);
 						} else {
 							that.showLayer.resetPositionProgress();
@@ -188,7 +189,7 @@ var OperateLayer = cc.Layer.extend({
 						FLAG = Config.MOVE_FORWARD;
 						that.showLayer.adjustPositionEnded(FLAG);
 						if (!isAdjustPosition && !isOperateAdjust) {
-							that.showLayer.setPositionProgressDirection(FLAG, player.getMoveDirectionTime());
+							that.showLayer.setPositionProgressDirection(FLAG, player.getMoveDirectionTime(FLAG));
 							eventCenter.dispatchEvent(Config.events.MOVE_FORWARD_BEGIN, positionEvent);
 						} else {
 						}
@@ -202,7 +203,7 @@ var OperateLayer = cc.Layer.extend({
 						FLAG = Config.MOVE_BACKWARD;
 						that.showLayer.adjustPositionEnded(FLAG);
 						if (!isAdjustPosition && !isOperateAdjust) {
-							that.showLayer.setPositionProgressDirection(FLAG, player.getMoveDirectionTime());
+							that.showLayer.setPositionProgressDirection(FLAG, player.getMoveDirectionTime(FLAG));
 							eventCenter.dispatchEvent(Config.events.MOVE_BACKWARD_BEGIN, positionEvent);
 						} else {
 						}
@@ -221,7 +222,7 @@ var OperateLayer = cc.Layer.extend({
 				if (isBegin) {
 					if (cc.rectContainsPoint(target.getBoundingBox(), pos)) {
 						if (isAdjustPosition) {
-							console.log("end");
+							//console.log("end");
 							eventCenter.dispatchEvent(Config.events.ADJUST_GO, {role: Config.PLAYER, time: nowTime, FLAG: null})
 						} else {
 							// if not satisfied the adjust position time, then we conclude the operation satisfied the adjust to face time
@@ -344,10 +345,15 @@ var OperateLayer = cc.Layer.extend({
 				return false;
 			},
 			onTouchEnded: function(touch, event) {
-				that.showLayer.blockEnd();
+				that.showLayer.blockEnd(player.getName());
 				cc.eventManager.resumeTarget(that.showLayer.attackButton);
 				that.showLayer.doAttack();
-				eventCenter.dispatchEvent(Config.events.DEFENCE_END, {role: Config.PLAYER, time: Date.now()});
+				var endEvent = {
+					role: Config.PLAYER,
+					time: Date.now(),
+					FLAG: Config.OPERATE_EVENT
+				};
+				eventCenter.dispatchEvent(Config.events.DEFENCE_END, endEvent);
 				return true;
 			}
 		});
@@ -360,11 +366,14 @@ var OperateLayer = cc.Layer.extend({
 				var target = event.getCurrentTarget();
 				var pos = touch.getLocation();
 				if(cc.rectContainsPoint(target.getBoundingBox(), pos)) {
-					eventCenter.dispatchEvent(Config.events.OPERATE_ENERGY_BEGIN, {role: Config.PLAYER, time: Date.now()});
-
+					var energyEvent = {
+						role: Config.PLAYER,
+						time: Date.now(),
+						index: player.getEnergyIndex()
+					};
+					eventCenter.dispatchEvent(Config.events.OPERATE_ENERGY_BEGIN, energyEvent);
 					return true;
 				}
-
 				return false;
 			},
 			onTouchMoved: function(touch, event) {
