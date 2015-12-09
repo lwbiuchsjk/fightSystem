@@ -53,12 +53,13 @@ var Character = {
 			frameTime : "frameTime",
 			maxDefenceTime : "maxDefenceTime",
 			maxNoActionTime : "maxNoActionTime",
+			operateStartEnergy: "operateStartEnergy"
 		},
 		action: {
 			blockPunishment : "blockPunishment", 	// when i block fail,  i will no action by my block punishment
 			blockBonus : "blockBonus",				// when i block succeed, the enemy will no action by his block punishment
-			easyTime : "easyTime",
-			hardTime : "hardTime",
+			easyAttackTime : "easyAttackTime",
+			hardAttackTime : "hardAttackTime",
 			hitTime : "hitTime",
 			adjustTime : "adjustTime",
 			blockWindow : "blockWindow",
@@ -117,13 +118,19 @@ var Character = {
 
 			action_blockPunishment: 1000,
 			action_blockBonus: 300,
-			action_easyTime: 500 / 1000,
-			action_hardTime: 2000 / 1000,
+			action_easyAttackTime: 500 / 1000,
+			action_hardAttackTime: 2000 / 1000,
 			action_hitTime: 500 / 1000,
 			action_adjustTime: 500 / 1000,
 			action_blockWindow: 250,
 			action_adjustWindow: 50000,
-			action_directionTime: 500 / 1000,
+			//action_directionTime: 500 / 1000,
+			action_directionTime: {
+				left: 500 / 1000,
+				right: 500 / 1000,
+				moveForward: 500 / 1000,
+				moveBackward: 500 / 1000,
+			},
 			action_movingEvent: {
 				me: {
 					begin: null,
@@ -178,13 +185,19 @@ var Character = {
 
 			action_blockPunishment: 250,
 			action_blockBonus: 1000,
-			action_easyTime: 500 / 1000,
-			action_hardTime: 2000 / 1000,
+			action_easyAttackTime: 500 / 1000,
+			action_hardAttackTime: 2000 / 1000,
 			action_hitTime: 500 / 1000,
 			action_adjustTime: 500 / 1000,
 			action_blockWindow: 250,
 			action_adjustWindow: 50000,
-			action_directionTime: 500 / 1000,
+			//action_directionTime: 500 / 1000,
+			action_directionTime: {
+				left: 500 / 1000,
+				right: 500 / 1000,
+				moveForward: 500 / 1000,
+				moveBackward: 500 / 1000,
+			},
 			action_movingEvent: {
 				me: {
 					begin: null,

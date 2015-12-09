@@ -82,22 +82,18 @@ var ShowLayer = cc.Layer.extend({
      *
      */
     initAttackMovement: function(easyTime, hardTime) {
-        if (this.attackEasyUp == null) {
-            this.attackEasyUp = cc.sequence(
-                cc.moveTo(easyTime, cc.p(this.attackButton.x + Config.ATTACK_PROGRESS_X, this.attackButton.y + Config.ATTACK_PROGRESS_Y + 300)),
-                cc.callFunc(function() {
-                    this.eventCenter.dispatchEvent(Config.events.EASY_READY, {role: Config.PLAYER, time: Date.now()});
-                }.bind(this), this)
-            );
-        }
-        if (this.attackHardUp == null) {
-            this.attackHardUp = cc.sequence(
-                cc.moveTo(hardTime, cc.p(this.attackButton.x + Config.ATTACK_PROGRESS_X, this.attackButton.y + Config.ATTACK_PROGRESS_Y + 300)),
-                cc.callFunc(function() {
-                    this.eventCenter.dispatchEvent(Config.events.HARD_READY, {role: Config.PLAYER, time: Date.now()});
-                }.bind(this), this)
-            );
-        }
+        this.attackEasyUp = cc.sequence(
+            cc.moveTo(easyTime, cc.p(this.attackButton.x + Config.ATTACK_PROGRESS_X, this.attackButton.y + Config.ATTACK_PROGRESS_Y + 300)),
+            cc.callFunc(function() {
+                this.eventCenter.dispatchEvent(Config.events.EASY_READY, {role: Config.PLAYER, time: Date.now()});
+            }.bind(this), this)
+        );
+        this.attackHardUp = cc.sequence(
+            cc.moveTo(hardTime, cc.p(this.attackButton.x + Config.ATTACK_PROGRESS_X, this.attackButton.y + Config.ATTACK_PROGRESS_Y + 300)),
+            cc.callFunc(function() {
+                this.eventCenter.dispatchEvent(Config.events.HARD_READY, {role: Config.PLAYER, time: Date.now()});
+            }.bind(this), this)
+        );
     },
     attackBegan: function() {
         if (!this.easyButton.getParent() && !this.hardButton.getParent()) {
@@ -156,7 +152,6 @@ var ShowLayer = cc.Layer.extend({
     },
     enemyEasyReady: function() {
         this.attackStatus.setTexture(res.easyGo);
-        console.log("Ready");
         this.attackStatus.scaleX = 0.5;
     },
     enemyHardBegin: function() {
@@ -171,6 +166,11 @@ var ShowLayer = cc.Layer.extend({
         this.setAttackEnergyTexture(Config.ENEMY.category, this.enemyAttackEnergy);
         this.attackStatus.scaleX = 1;
     },
+    /**
+     * used to set attack texture based on FLAG`s attack energy.
+     * @param FLAG
+     * @param index
+     */
     setAttackEnergyTexture: function(FLAG, index) {
         var sprite, texture;
         switch (FLAG) {
@@ -252,7 +252,6 @@ var ShowLayer = cc.Layer.extend({
             this.attackProgress.stopAllActions();
             this.attackEasyUp.setTarget(null);
             this.attackHardUp.setTarget(null);
-            console.log("stop progress");
         }
     },
     noAttack: function() {
@@ -271,11 +270,9 @@ var ShowLayer = cc.Layer.extend({
     noPosition: function() {
         this.positionButton.setTexture(res.noPosition);
         this.adjustPositionEnded();
-        this.setComponentEnbaled(Config.POSITION_BUTTON, false);
     },
     doPosition: function() {
         this.positionButton.setTexture(res.position);
-        this.setComponentEnbaled(Config.POSITION_BUTTON, true);
     },
     setPositionProgressDirection: function(FLAG, time) {
         var positionProgress = this.positionProgress;
@@ -341,7 +338,7 @@ var ShowLayer = cc.Layer.extend({
     resetPositionProgress: function() {
         var positionMovement = this.positionMovement;
         var positionProgress = this.positionProgress;
-        if (positionMovement.getTarget() != null) { //!!! getTarget not getTarget()
+        if (positionMovement != null && positionMovement.getTarget() != null) {
             positionProgress.stopAllActions();
             positionMovement.setTarget(null);
         }
@@ -399,8 +396,7 @@ var ShowLayer = cc.Layer.extend({
     noDefence: function() {
         this.defenceButton.setTexture(res.noDefence);
         this.defenceProgress.setVisible(false);
-        //this.defenceAction(Config.events.DEFENCE_END, Date.now());
-        this.blockEnd();
+        this.blockEnd(Config.PLAYER);
     },
     doDefence: function() {
         this.defenceButton.setTexture(res.defence);
@@ -430,9 +426,12 @@ var ShowLayer = cc.Layer.extend({
     },
     enemyDefenceBegin: function() {
         this.defenceStatus.setTexture(res.defence);
+        this.attackStatus.setTexture(res.noAttack);
+        this.attackStatus.scaleX = 1;
     },
     resetEnemyDefence: function() {
         this.defenceStatus.setTexture(res.noDefence);
+        this.enemyAttackEnd();
     },
     /**
      * show layer will show the block action element with this function. the character is used to distingush player and AI.
@@ -474,7 +473,9 @@ var ShowLayer = cc.Layer.extend({
     },
 
     /**
-     * update function is used to listen the frame event, and no-stop action, like energy bar move up and down
+     *
+     * below is the ENERGY_FUNCTION
+     *
      */
 
     setEnergyIndex: function(FLAG, index) {
@@ -506,22 +507,7 @@ var ShowLayer = cc.Layer.extend({
         dot.setTexture(res["Dot" + index]);
         this[fighter + "EnergyIndex"] = index;
     },
-    _getFighter: function(FLAG) {
-        switch(FLAG) {
-            case Config.RIGHT_SERIES: {
-                return Config.PLAYER;
-            }
-            case Config.LEFT_SERIES: {
-                return Config.PLAYER;
-            }
-            case Config.ENEMY.category: {
-                return FLAG;
-            }
-        }
-
-    },
     energyRotation: function() {
-        //this.eventCenter.dispatchEvent(Config.events.PLAYER_ENERGY_ROTATION, {role: Config.PLAYER, index: this.playerEnergyIndex, time: Date.now()});
         this.eventCenter.dispatchEvent(Config.events.ENERGY_ROTATION_GO, {role: Config.PLAYER, index: this.playerEnergyIndex, time: Date.now()});
         this.eventCenter.dispatchEvent(Config.events.ENERGY_ROTATION_GO, {role: Config.ENEMY.category, index: this.enemyEnergyIndex, time: Date.now()});
     },
@@ -548,10 +534,11 @@ var ShowLayer = cc.Layer.extend({
         }.bind(this));
     },
     /**
-     * status action function
+     *
+     * below is the STATUS_FUNCTION
+     *
      */
     setPositionLabel: function(label) {
-        //console.log(label);
         this.positionStatus.setTexture(res[label]);
     },
     enemyNoActionGo: function() {
@@ -571,6 +558,19 @@ var ShowLayer = cc.Layer.extend({
     },
     getComponentEnabled: function(target) {
         return this[target].enable;
+    },
+    _getFighter: function(FLAG) {
+        switch(FLAG) {
+            case Config.RIGHT_SERIES: {
+                return Config.PLAYER;
+            }
+            case Config.LEFT_SERIES: {
+                return Config.PLAYER;
+            }
+            case Config.ENEMY.category: {
+                return FLAG;
+            }
+        }
     },
 
     /**

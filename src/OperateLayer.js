@@ -156,7 +156,7 @@ var OperateLayer = cc.Layer.extend({
 						};
 						if (!isAdjustPosition && !isOperateAdjust) {
 							that.showLayer.adjustPositionEnded(FLAG);
-							that.showLayer.setPositionProgressDirection(FLAG, player.getMoveDirectionTime());
+							that.showLayer.setPositionProgressDirection(FLAG, player.getMoveDirectionTime(FLAG));
 							eventCenter.dispatchEvent(Config.events.MOVE_ASIDE_BEGIN, positionEvent);
 						} else {
 							that.showLayer.resetPositionProgress();
@@ -173,7 +173,7 @@ var OperateLayer = cc.Layer.extend({
 						};
 						if (!isAdjustPosition && !isOperateAdjust) {
 							that.showLayer.adjustPositionEnded(FLAG);
-							that.showLayer.setPositionProgressDirection(FLAG, player.getMoveDirectionTime());
+							that.showLayer.setPositionProgressDirection(FLAG, player.getMoveDirectionTime(FLAG));
 							eventCenter.dispatchEvent(Config.events.MOVE_ASIDE_BEGIN, positionEvent);
 						} else {
 							that.showLayer.resetPositionProgress();
@@ -189,7 +189,7 @@ var OperateLayer = cc.Layer.extend({
 						FLAG = Config.MOVE_FORWARD;
 						that.showLayer.adjustPositionEnded(FLAG);
 						if (!isAdjustPosition && !isOperateAdjust) {
-							that.showLayer.setPositionProgressDirection(FLAG, player.getMoveDirectionTime());
+							that.showLayer.setPositionProgressDirection(FLAG, player.getMoveDirectionTime(FLAG));
 							eventCenter.dispatchEvent(Config.events.MOVE_FORWARD_BEGIN, positionEvent);
 						} else {
 						}
@@ -203,7 +203,7 @@ var OperateLayer = cc.Layer.extend({
 						FLAG = Config.MOVE_BACKWARD;
 						that.showLayer.adjustPositionEnded(FLAG);
 						if (!isAdjustPosition && !isOperateAdjust) {
-							that.showLayer.setPositionProgressDirection(FLAG, player.getMoveDirectionTime());
+							that.showLayer.setPositionProgressDirection(FLAG, player.getMoveDirectionTime(FLAG));
 							eventCenter.dispatchEvent(Config.events.MOVE_BACKWARD_BEGIN, positionEvent);
 						} else {
 						}
@@ -366,11 +366,14 @@ var OperateLayer = cc.Layer.extend({
 				var target = event.getCurrentTarget();
 				var pos = touch.getLocation();
 				if(cc.rectContainsPoint(target.getBoundingBox(), pos)) {
-					eventCenter.dispatchEvent(Config.events.OPERATE_ENERGY_BEGIN, {role: Config.PLAYER, time: Date.now()});
-
+					var energyEvent = {
+						role: Config.PLAYER,
+						time: Date.now(),
+						index: player.getEnergyIndex()
+					};
+					eventCenter.dispatchEvent(Config.events.OPERATE_ENERGY_BEGIN, energyEvent);
 					return true;
 				}
-
 				return false;
 			},
 			onTouchMoved: function(touch, event) {
@@ -401,6 +404,6 @@ var OperateLayer = cc.Layer.extend({
 		cc.eventManager.addListener(posListener, this.showLayer.positionButton);
 		cc.eventManager.addListener(defenceListener, this.showLayer.defenceButton);
 		cc.eventManager.addListener(energyListener, this.showLayer.energyDots[Config.LEFT_SERIES]);
-		//cc.eventManager.addListener(energyListener.clone(), this.showLayer.energyDots[Config.RIGHT_SERIES]);
+		cc.eventManager.addListener(energyListener.clone(), this.showLayer.energyDots[Config.RIGHT_SERIES]);
 	}
 });

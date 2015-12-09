@@ -17,7 +17,8 @@ var EnemyAi = cc.Node.extend({
 	maxPossibility: null,
 	actionTime: null,
 
-	executor: null,
+	actionExecutor: null,
+	energyExecutor: null,
 
 	ctor: function(fighter, instinct, eventCenter, showLayer){
 		this._super();
@@ -43,8 +44,9 @@ var EnemyAi = cc.Node.extend({
 		this.instinct = {};
 
 		this.maxPossibility = {};
-		this.maxPossibility[Config.OPERATE_EVENT] = 90;
-		this.maxPossibility[Config.INSTINCT] = 90;
+		this.maxPossibility[Config.OPERATE_EVENT] = 90;		// NO USE
+		this.maxPossibility[Config.UP_INSTINCT] = 90;
+		this.maxPossibility[Config.DOWN_INSTINCT] = 10;
 
 		this.acting = {};
 		this.acting[Config.events.EASY_BEGIN] = false;
@@ -56,11 +58,15 @@ var EnemyAi = cc.Node.extend({
 		this.acting[Config.events.BLOCK_BEGIN] = false;
 		this.acting[Config.events.ADJUST_TO_FACE] = false;
 		this.acting[Config.OPERATE_EVENT] = false;
+		// energy event in the other action list, do not use the same action list with the other action.
+		this.acting[Config.events.OPERATE_ENERGY_BEGIN] = false;
 
 		this.actionTime = 0;
 
-		this.executor = new cc.Node.create();
-		this.addChild(this.executor);
+		this.actionExecutor = new cc.Node.create();
+		this.energyExecutor = new cc.Node.create();
+		this.addChild(this.actionExecutor);
+		this.addChild(this.energyExecutor);
 	},
 	onEnter: function() {
 		this._super();
@@ -73,74 +79,58 @@ var EnemyAi = cc.Node.extend({
 			this.actionTime -= 20
 		} else
 		if (this.thinkCount > 0 && this.thinkCount % 10 == 0) {
-			this._tactic();
+			this._tactic(this.thinkCount);
 		}
 	},
-	_tactic: function() {
+	_tactic: function(count) {
 		this._resetInstinct();
 		var me = this.me;
 		var enemy = this.me.status.target;
 		if (me.getNoActionTime() <= 0) {
 			if (me.enemies.broadsideOnEnemy != null) {
-				//this._do_easyAttackBegin();
+				this._generateActionPos(Config.events.HARD_BEGIN, Config.OP_PLUS, 30);
 				this._generateActionPos(Config.events.EASY_BEGIN, Config.OP_PLUS, 60);
+				this._generateActionPos(Config.events.MOVE_ASIDE_BEGIN, Config.OP_SET, 0);
 			} else
 			if (me.enemies.enemyBroadsideOnMe != null) {
-				/*
-				if (me.isInAdjustWindow()) {
-					//this._do_adjustToFaceFlash();
-					this._do_adjustToFace(FLASH);
-				} else {
-					this._do_adjustToFace();
-				}
-				*/
 				this._generateActionPos(Config.events.ADJUST_TO_FACE, Config.OP_PLUS, 60);
+				this._generateActionPos(Config.events.EASY_BEGIN, Config.OP_SET, 0);
+				this._generateActionPos(Config.events.HARD_BEGIN, Config.OP_SET, 0);
+				this._generateActionPos(Config.events.DEFENCE_BEGIN, Config.OP_SET, 0);
+
 			} else
 			if (me.enemies.enemyFacedToMe != null) {
 				if (enemy.getNoActionTime() > 0) {
-					//console.log("is acting? " + this._isActing());
-					/*
-					if (me.isInAdjustWindow()) {
-						this._do_hardAttackBegin(FLASH);
-					} else {
-						this._do_hardAttackBegin();
-					}
-					*/
-					this._generateActionPos(Config.events.HARD_BEGIN, Config.OP_PLUS, 60);
+					this._generateActionPos(Config.events.EASY_BEGIN, Config.OP_PLUS, 60);
 				} else
 				if (enemy.isDefenceBegan()) {
-					//console.log("DEFENCE");
-					/*
-					if (me.isInAdjustWindow()){
-						this._do_moveAsideBegin(FLASH);
-					} else {
-						this._do_moveAsideBegin();
-					}
-					*/
 					this._generateActionPos(Config.events.MOVE_ASIDE_BEGIN, Config.OP_PLUS, 60);
 				} else
 				if (enemy.isHappened(Config.EASY_ATTACK_MODE, Config.events.EASY_BEGIN)) {
 					if (enemy.isHappened(Config.EASY_ATTACK_MODE, Config.events.EASY_READY)) {
 						if (enemy.isHappened(Config.EASY_ATTACK_MODE, Config.events.EASY_GO)) {
-							//this._do_blockBegin();
 							this._generateActionPos(Config.events.BLOCK_BEGIN, Config.OP_PLUS, 60);
 						} else {
-							//this._do_defenceBegin();
 							this._generateActionPos(Config.events.DEFENCE_BEGIN, Config.OP_PLUS, 60);
 						}
+					} else {
+						this._generateActionPos(Config.events.MOVE_ASIDE_BEGIN, Config.OP_PLUS, 60);
 					}
-					//console.log("EASY COMING!!!");
 				} else
 				if (enemy.isHappened(Config.HARD_ATTACK_MODE, Config.events.HARD_BEGIN)) {
 					if (enemy.isHappened(Config.HARD_ATTACK_MODE, Config.events.HARD_READY)) {
 						if (enemy.isHappened(Config.HARD_ATTACK_MODE, Config.events.HARD_GO)) {
+							this._generateActionPos(Config.events.BLOCK_BEGIN, Config.OP_PLUS, 60);
+						} else {
+							this._generateActionPos(Config.events.DEFENCE_BEGIN, Config.OP_PLUS, 60);
 						}
+					} else {
+						this._generateActionPos(Config.events.EASY_BEGIN, Config.OP_PLUS, 60);
 					}
 				} else
 				if (enemy.isHappened(Config.ADJUST_POSITION, Config.events.MOVE_ASIDE_BEGIN)) {
 					this._generateActionPos(Config.events.MOVE_ASIDE_BEGIN, Config.OP_PLUS, 60);
-					//this._do_moveAsideBegin();
-					//console.log("MOVING!!!")
+					console.log("MOVING!!!")
 				} else
 				if (enemy.isHappened(Config.ADJUST_POSITION, Config.events.MOVE_FORWARD_BEGIN)) {
 					console.log("COMING TO ME!!!")
@@ -148,8 +138,6 @@ var EnemyAi = cc.Node.extend({
 				if (enemy.isHappened(Config.ADJUST_POSITION, Config.events.MOVE_BACKWARD_BEGIN)) {
 					console.log("LEAVING ME!!!")
 				} else {
-					//console.log("nothing");
-					//this._do_easyAttackBegin();
 					this._generateActionPos(Config.events.EASY_BEGIN, Config.OP_PLUS, 30);
 					this._generateActionPos(Config.events.HARD_BEGIN, Config.OP_PLUS, 30);
 					this._generateActionPos(Config.events.MOVE_ASIDE_BEGIN, Config.OP_PLUS, 60);
@@ -157,12 +145,27 @@ var EnemyAi = cc.Node.extend({
 			}
 		} else {
 			this._setNoActionInstinct();
+			/**
+			 * TODO
+			 * the temporary energy begin action
+			 */
+			if (Config.ENERGY_WEAK[me.getAttackEnergy()] == me.getTarget().getEnergyIndex() || Config.ENERGY_MIGHTY[me.getTarget().getAttackEnergy()] == me.getEnergyIndex()) {
+				console.log("change");
+				this._do_operateEnergyBegin();
+			}
 		}
 
+		/**
+		 * TODO
+		 * the temporary energy end action
+		 */
+		if (Config.ENERGY_MIGHTY[me.getAttackEnergy()] == me.getTarget().getEnergyIndex() || Config.ENERGY_WEAK[me.getTarget().getAttackEnergy()] == me.getEnergyIndex()) {
+			console.log("stop");
+			this._do_operateEnergyEnd();
+		}
 
 		var conclusion = this._getAction();
 		if (conclusion.action != null) {
-			console.log(conclusion.action);
 			this[conclusion.action](conclusion.FLASH);
 		}
 	},
@@ -210,14 +213,14 @@ var EnemyAi = cc.Node.extend({
 			this.acting[i] = false;
 		}
 	},
-	_do_Something: function(something, delayTime, condition, CLEAR_FLAG, OPEN_FLAG, CLOSE_FLAG, exp) {
+	_do_Something: function(something, delayTime, condition, CLEAR_FLAG, OPEN_FLAG, CLOSE_FLAG, executor) {
 		condition = condition || false;
 		if (condition) {
 			if (CLEAR_FLAG === true) {
 				this._exceptionClearAction(OPEN_FLAG);
 			}
 			this._openActing(OPEN_FLAG);
-			this.executor.scheduleOnce(function() {
+			executor.scheduleOnce(function() {
 				something();
 				this._closeActing(CLOSE_FLAG);
 			}.bind(this), delayTime)
@@ -233,7 +236,8 @@ var EnemyAi = cc.Node.extend({
 	},
 	_generateActionPos: function(ACTION, OP, number) {
 		var tmp = this.instinct[ACTION];
-		var maximum = this.maxPossibility[Config.INSTINCT];
+		var maximum = this.maxPossibility[Config.UP_INSTINCT];
+		var minimum = this.maxPossibility[Config.DOWN_INSTINCT];
 		var conclusion = this._opNumber(OP, tmp, number);
 		if (conclusion > maximum) {
 			this.instinct[ACTION] = maximum;
@@ -255,7 +259,7 @@ var EnemyAi = cc.Node.extend({
 		var downLimit = Config.POSSIBILITY_SCALE[0];
 		var upLimit = Config.POSSIBILITY_SCALE[1];
 		var me = this.me;
-		var limit = 25;//Math.random() * (upLimit - downLimit) + downLimit;
+		var limit = Math.random() * (upLimit - downLimit) + downLimit;
 		var actionList = [];
 		var flashFlag = Config.OPERATE_EVENT;
 		for (var i in this.instinct) {
@@ -276,7 +280,7 @@ var EnemyAi = cc.Node.extend({
 		for (var j in actionList) {
 			nameList.push(j);
 		}
-		if (nameList.length == 0) {
+		if (nameList.length == 0 || this._isActing()) {
 			nameList.push(Config.DO_CONTINUE);
 		}
 		var actionTag = Math.round(Math.random() * (nameList.length - 1)), FLASH;
@@ -286,6 +290,7 @@ var EnemyAi = cc.Node.extend({
 				FLASH = Config.OPERATE_EVENT;
 			}
 		}
+		console.log(actionList);
 		return {
 			action: "_do_" + nameList[actionTag],
 			FLASH: FLASH
@@ -312,24 +317,23 @@ var EnemyAi = cc.Node.extend({
 		var me = this.me;
 		var FLAG = Config.events.EASY_BEGIN;
 		var beginCondition = !this._isActing(FLAG) && !me.isHappened(Config.EASY_ATTACK_MODE, Config.events.EASY_BEGIN);
-		//console.log("flag: " + FLAG + " is acting: " + this._isActing(FLAG) + " is begin: " + me.isHappened(Config.EASY_ATTACK_MODE, Config.events.EASY_BEGIN));
+		console.log("flag: " + FLAG + " is acting: " + this._isActing(FLAG) + " is begin: " + me.isHappened(Config.EASY_ATTACK_MODE, Config.events.EASY_BEGIN));
 		var beginDelay = this._getReflectionTime();
 		var beginAction = function () {
-			//this._exceptionClearAction(FLAG);
 			// below is something about begin
 			var easyBeginTime = Date.now();
 			var easyBeginEvent = {
 				role: me.getName(),
 				time: easyBeginTime
 			};
-			//console.info("easy begin time: " + easyBeginTime);
+			console.info("easy begin time: " + easyBeginTime);
 			this.eventCenter.dispatchEvent(Config.events.EASY_BEGIN, easyBeginEvent);
 			var readyCondition = this._isActing(FLAG) && !me.isHappened(Config.EASY_ATTACK_MODE, Config.events.EASY_READY) && me.isHappened(Config.EASY_ATTACK_MODE, Config.events.EASY_BEGIN);
 			var readyDelay;
 			if (FLASH == Config.OPERATE_EVENT) {
 				readyDelay = this._getReflectionTime();
 			} else {
-				readyDelay = me.action.easyTime + this._getReflectionTime();
+				readyDelay = me.getAttackTime(Config.EASY_ATTACK_MODE) + this._getReflectionTime();
 			}
 			var readyAction = function() {
 				// below is something about ready
@@ -338,7 +342,7 @@ var EnemyAi = cc.Node.extend({
 					role: me.getName(),
 					time: easyReadyTime
 				};
-				//console.info("easy ready duration: " + (easyReadyTime - easyBeginTime));
+				console.info("easy ready duration: " + (easyReadyTime - easyBeginTime));
 				if (FLASH == Config.OPERATE_EVENT) {
 					this.eventCenter.dispatchEvent(Config.events.ADJUST_GO, easyReadyEvent);
 				} else {
@@ -353,14 +357,14 @@ var EnemyAi = cc.Node.extend({
 						role: me.getName(),
 						time: easyGoTime
 					};
-					//console.info("easy go duration: " + (easyGoTime - easyReadyTime));
+					console.info("easy go duration: " + (easyGoTime - easyReadyTime));
 					this.eventCenter.dispatchEvent(Config.events.EASY_GO, easyGoEvent);
 				}.bind(this);
-				this._do_Something(goAction, goDelay, goCondition, false, null, FLAG, "easy go");
+				this._do_Something(goAction, goDelay, goCondition, false, null, FLAG, this.actionExecutor);
 			}.bind(this);
-			this._do_Something(readyAction, readyDelay, readyCondition, false, null, null, "easy ready");
+			this._do_Something(readyAction, readyDelay, readyCondition, false, null, null, this.actionExecutor);
 		}.bind(this);
-		this._do_Something(beginAction, beginDelay, beginCondition, true, FLAG, null,  "easy begin");
+		this._do_Something(beginAction, beginDelay, beginCondition, true, FLAG, null,  this.actionExecutor);
 	},
 	_do_hardAttackBegin: function(FLASH) {
 		var me = this.me;
@@ -368,7 +372,6 @@ var EnemyAi = cc.Node.extend({
 		var beginCondition = !this._isActing(FLAG) && !me.isHappened(Config.EASY_ATTACK_MODE, Config.events.EASY_BEGIN);
 		var beginDelay = this._getReflectionTime();
 		var beginAction = function () {
-			//this._exceptionClearAction(FLAG);
 			// below is something about begin
 			var hardBeginTime = Date.now();
 			var hardBeginEvent = {
@@ -382,7 +385,7 @@ var EnemyAi = cc.Node.extend({
 			if (FLASH == Config.OPERATE_EVENT) {
 				readyDelay = this._getReflectionTime();
 			} else {
-				readyDelay = me.action.hardTime + this._getReflectionTime();
+				readyDelay = me.getAttackTime(Config.HARD_ATTACK_MODE) + this._getReflectionTime();
 			}
 			var readyAction = function() {
 				// below is something about ready
@@ -391,7 +394,7 @@ var EnemyAi = cc.Node.extend({
 					role: me.getName(),
 					time: hardReadyTime
 				};
-				//console.log("hard ready duration: " + (hardReadyTime - hardBeginTime));
+				console.log("hard ready duration: " + (hardReadyTime - hardBeginTime));
 				if (FLASH == Config.OPERATE_EVENT) {
 					this.eventCenter.dispatchEvent(Config.events.ADJUST_GO, hardReadyEvent);
 				} else {
@@ -406,14 +409,14 @@ var EnemyAi = cc.Node.extend({
 						role: me.getName(),
 						time: hardGoTime
 					};
-					//console.log("hard go duration: " + (hardGoTime - hardReadyTime));
+					console.log("hard go duration: " + (hardGoTime - hardReadyTime));
 					this.eventCenter.dispatchEvent(Config.events.HARD_GO, hardGoEvent);
 				}.bind(this);
-				this._do_Something(goAction, goDelay, goCondition, false, null, FLAG, "hard go");
+				this._do_Something(goAction, goDelay, goCondition, false, null, FLAG, this.actionExecutor);
 			}.bind(this);
-			this._do_Something(readyAction, readyDelay, readyCondition, false, null, null, "hard ready");
+			this._do_Something(readyAction, readyDelay, readyCondition, false, null, null, this.actionExecutor);
 		}.bind(this);
-		this._do_Something(beginAction, beginDelay, beginCondition, true, FLAG, null, "hard begin");
+		this._do_Something(beginAction, beginDelay, beginCondition, true, FLAG, null, this.actionExecutor);
 	},
 	/**
 	 * function use the Config.events.MOVE_ASIDE_BEGIN FLAG to distinguish whether the AI is doing turn-to-face action.
@@ -426,7 +429,6 @@ var EnemyAi = cc.Node.extend({
 		var adjustBeginDelay = this._getReflectionTime();
 		var adjustBeginCondition = !this._isActing(FLAG) || (me.isDefenceBegan() && this._isActing(FLAG));
 		var adjustBeginAction = function() {
-			//this._exceptionClearAction();
 			var adjustBeginTime = Date.now();
 			var adjustBeginEvent = {
 				role: me.getName(),
@@ -452,13 +454,13 @@ var EnemyAi = cc.Node.extend({
 				this.eventCenter.dispatchEvent(Config.events.ADJUST_TO_FACE, adjustGoEvent);
 			}.bind(this);
 			if (FLASH != Config.OPERATE_EVENT) {
-				this._do_Something(adjustGoAction, adjustGoDelay, adjustGoCondition, false, null, FLAG,  adjustExp)
+				this._do_Something(adjustGoAction, adjustGoDelay, adjustGoCondition, false, null, FLAG,  this.actionExecutor)
 			}
 		}.bind(this);
 		if (FLASH == Config.OPERATE_EVENT) {
-			this._do_Something(adjustBeginAction, adjustBeginDelay, adjustBeginCondition, true, FLAG, FLAG, "turn to face end");
+			this._do_Something(adjustBeginAction, adjustBeginDelay, adjustBeginCondition, true, FLAG, FLAG, this.actionExecutor);
 		} else {
-			this._do_Something(adjustBeginAction, adjustBeginDelay, adjustBeginCondition, true, FLAG, null, "turn to face begin");
+			this._do_Something(adjustBeginAction, adjustBeginDelay, adjustBeginCondition, true, FLAG, null, this.actionExecutor);
 		}
 	},
 	/**
@@ -472,10 +474,9 @@ var EnemyAi = cc.Node.extend({
 		var asideBeginDelay = this._getReflectionTime();
 		var FLAG = Config.events.MOVE_ASIDE_BEGIN;
 		var asideBeginCondition = !this._isActing(FLAG);
-		//console.log("out acting: " + this._isActing(FLAG));
+		console.log("out acting: " + this._isActing(FLAG));
 		var asideFLAG = Config.LEFT_SERIES;
 		var asideBeginAction = function() {
-			//this._exceptionClearAction(FLAG);
 			var asideBeginTime = Date.now();
 			var asideBeginEvent = {
 				role: me.getName(),
@@ -494,11 +495,11 @@ var EnemyAi = cc.Node.extend({
 			if (FLASH == Config.OPERATE_EVENT) {
 				asideEndDelay = 0.2;
 			} else {
-				asideEndDelay = this._getReflectionTime() + me.action.adjustTime;
+				asideEndDelay = this._getReflectionTime() + me.getMoveDirectionTime(asideFLAG);
 			}
 			var asideEndCondition = this._isActing(FLAG);
-			//console.log("in acting: " + this._isActing(FLAG));
-			//console.log("delay time: " + asideEndDelay);
+			console.log("in acting: " + this._isActing(FLAG));
+			console.log("delay time: " + asideEndDelay);
 			var asideEndAction = function() {
 				var asideEndTime = Date.now();
 				console.log("in FLAG: " + FLASH);
@@ -514,9 +515,9 @@ var EnemyAi = cc.Node.extend({
 				}
 				console.log("move aside end time: " + asideEndTime);
 			}.bind(this);
-			this._do_Something(asideEndAction, asideEndDelay, asideEndCondition, false, null, FLAG, "move aside end");
+			this._do_Something(asideEndAction, asideEndDelay, asideEndCondition, false, null, FLAG, this.actionExecutor);
 		}.bind(this);
-		this._do_Something(asideBeginAction, asideBeginDelay, asideBeginCondition, true, FLAG, null, "move aside begin");
+		this._do_Something(asideBeginAction, asideBeginDelay, asideBeginCondition, true, FLAG, null, this.actionExecutor);
 	},
 	_do_defenceBegin: function() {
 		var me = this.me;
@@ -532,7 +533,7 @@ var EnemyAi = cc.Node.extend({
 			this.eventCenter.dispatchEvent(Config.events.DEFENCE_BEGIN, beginEvent);
 			console.log("enemy defence begin at " + beginTime);
 		}.bind(this);
-		this._do_Something(beginAction, beginDelay, beginCondition, false, FLAG, null, "defence begin");
+		this._do_Something(beginAction, beginDelay, beginCondition, true, FLAG, null, this.actionExecutor);
 	},
 	_do_blockBegin: function() {
 		var me = this.me;
@@ -547,13 +548,13 @@ var EnemyAi = cc.Node.extend({
 			};
 			this.eventCenter.dispatchEvent(Config.events.BLOCK_BEGIN, beginEvent);
 		}.bind(this);
-		this._do_Something(beginAction, beginDelay, beginCondition, false, FLAG, FLAG, "block begin");
+		this._do_Something(beginAction, beginDelay, beginCondition, false, FLAG, FLAG, this.actionExecutor);
 	},
 	_do_operateAdjust: function() {
 		var me = this.me;
 		var adjustDelay = this._getReflectionTime();
 		var FLAG = Config.OPERATE_EVENT;
-		var adjustCondition = !this._isActing(Config.OPERATE_EVENT);
+		var adjustCondition = !this._isActing(FLAG);
 		var adjustAction = function() {
 			var adjustEvent = {
 				role: me.getName(),
@@ -562,7 +563,37 @@ var EnemyAi = cc.Node.extend({
 			};
 			this.eventCenter.dispatchEvent(Config.events.ADJUST_GO, adjustEvent);
 		}.bind(this);
-		this._do_Something(adjustAction, adjustDelay, adjustCondition, false, FLAG, FLAG, "enemy adjust");
+		this._do_Something(adjustAction, adjustDelay, adjustCondition, false, FLAG, FLAG, this.actionExecutor);
+	},
+	_do_operateEnergyBegin: function() {
+		var me = this.me;
+		var operateDelay = this._getReflectionTime();
+		var FLAG = Config.events.OPERATE_ENERGY_BEGIN;
+		var operateCondition = !this._isActing(FLAG);
+		var operateAction = function() {
+			var operateEvent = {
+				role: me.getName(),
+				time: Date.now(),
+				index: me.getEnergyIndex()
+			};
+			this.eventCenter.dispatchEvent(Config.events.OPERATE_ENERGY_BEGIN, operateEvent);
+		}.bind(this);
+		this._do_Something(operateAction, operateDelay, operateCondition, false, FLAG, null, this.energyExecutor);
+	},
+	_do_operateEnergyEnd: function() {
+		var me = this.me;
+		var operateDelay = this._getReflectionTime();
+		var FLAG = Config.events.OPERATE_ENERGY_BEGIN;
+		var operateCondition = this._isActing(FLAG);
+		var operateAction = function() {
+			var operateEvent = {
+				role: me.getName(),
+				time: Date.now()
+			};
+			this.eventCenter.dispatchEvent(Config.events.OPERATE_ENERGY_END, operateEvent);
+		}.bind(this);
+		this._do_Something(operateAction, operateDelay, operateCondition, false, null, FLAG, this.energyExecutor);
+
 	},
 	_do_moveForwardBegin: function() {
 
@@ -591,15 +622,19 @@ var EnemyAi = cc.Node.extend({
 		var defenceEndDelay = 0;
 		var defenceEndAction = function() {
 			var defenceEndTime = Date.now();
-			this.eventCenter.dispatchEvent(Config.events.DEFENCE_END, {role: me.getName(), time: defenceEndTime});
+			var defenceEndEvent = {
+				role: me.getName(),
+				time: defenceEndTime,
+			};
+			this.eventCenter.dispatchEvent(Config.events.DEFENCE_END, defenceEndEvent);
 		}.bind(this);
-		this._do_Something(defenceEndAction, defenceEndDelay, defenceEndCondition, false, null, FLAG, "clear defence");
+		this._do_Something(defenceEndAction, defenceEndDelay, defenceEndCondition, false, null, FLAG, this.actionExecutor);
 		// acting clear
 		this._clearActing();
 		this._openActing(exception);
 		console.error("clear");
 
-		this.executor.unscheduleAllCallbacks();
+		this.actionExecutor.unscheduleAllCallbacks();
 	},
 	closeDefence: function() {
 		this._closeActing(Config.events.DEFENCE_BEGIN);
