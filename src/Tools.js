@@ -58,23 +58,32 @@ var CustomEventCenter = cc.Class.extend({
 	}
 });
 
-var CharacterFactory = cc.Class.extend({
-	ctor: function() {
+/**
+ * the factory can be used to generate characters and AIs from a specific template, which is defined in the Character.js & EnemyAI.js
+ */
+var InstanceFactory = cc.Class.extend({
+	template: null,
+	
+	ctor: function(template) {
+		this.template = template;
 	},
 	_isPrivate: function(string) {
 		return string.indexOf("_") >= 0
 	},
-	loadCharacter: function(target, label) {
+	loadTemplate: function(target, label) {
 		this._loadPrototype(target);
 		this._initInstance(target);
 		this._loadInstanceTemplate(label, target);
-		//console.log(target);
 	},
 	_loadPrototype: function(target) {
-		var proto = Character.proto;
+		var proto = this.template.proto;
 		for (var i in proto) {
 			if (!this._isPrivate(i)) {
-				target[i] = Object.create(proto[i]);
+				if (typeof proto[i] == "object") {
+					target[i] = Object.create(proto[i]);
+				} else {
+					target[i] = proto[i];
+				}
 			}
 		}
 		for (var i in proto) {
@@ -82,17 +91,21 @@ var CharacterFactory = cc.Class.extend({
 				var flag = this._navigateProperty(i, [])[0];
 				var ele = target[flag];
 				for (var j in ele) {
-					ele[j] = Object.create(proto[i]);
+					if (typeof proto[i] == "object") {
+						ele[j] = Object.create(proto[i]);
+					} else {
+						ele[j] = proto[i];
+					}
 				}
 			}
 		}
 	},
 	_loadInstanceTemplate: function(label, instance) {
-		if (label in Character.instance) {
-			var template = Character.instance[label];
-			for (var index in template) {
+		if (label in this.template.instance) {
+			var duplicate = this.template.instance[label];
+			for (var index in duplicate) {
 				var navigator = this._navigateProperty(index, []);
-				this._setCustomProperty(navigator, instance, template[index]);
+				this._setCustomProperty(navigator, instance, duplicate[index]);
 			}
 		}
 	},

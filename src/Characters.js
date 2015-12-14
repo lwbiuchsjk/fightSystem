@@ -181,7 +181,7 @@ var Character = {
 			status_adjustCoolWindow: 0,
 			status_frameTime: 20 / 1000,
 			status_maxNoActionTime: 6000,
-			status_maxDefenceTime: 1000,
+			status_maxDefenceTime: 10000,
 
 			action_blockPunishment: 250,
 			action_blockBonus: 1000,

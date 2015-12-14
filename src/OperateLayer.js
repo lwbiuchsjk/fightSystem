@@ -57,6 +57,7 @@ var OperateLayer = cc.Layer.extend({
 
 			onTouchMoved: function(touch, event) {
 				var pos = touch.getLocation();
+				var target = event.getCurrentTarget();
 				var easyUpLimit = this.easy.y + Config.MOVE_BUTTON_Y / 2;
 				var easyDownLimit = this.easy.y - Config.MOVE_BUTTON_Y / 2;
 				var isEasyHappened = player.isHappened(Config.EASY_ATTACK_MODE, Config.events.EASY_BEGIN);
@@ -87,9 +88,14 @@ var OperateLayer = cc.Layer.extend({
 				if (pos.y > easyUpLimit){
 					if (player.isHappened(Config.EASY_ATTACK_MODE, Config.events.EASY_READY)){
 						eventCenter.dispatchEvent(Config.events.EASY_GO, {role: Config.PLAYER, time: Date.now()});
-					} else if (player.isHappened(Config.HARD_ATTACK_MODE, Config.events.HARD_READY)){
+					} else
+					if (player.isHappened(Config.HARD_ATTACK_MODE, Config.events.HARD_READY)){
 						eventCenter.dispatchEvent(Config.events.HARD_GO, {role: Config.PLAYER, time: Date.now()});
 					}
+				} else
+				if (!(cc.rectContainsPoint(this.easy.getBoundingBox(), pos) || cc.rectContainsPoint(this.hard.getBoundingBox(), pos) || cc.rectContainsPoint(target.getBoundingBox(), pos))) {
+					that.showLayer.attackEnded();
+					player.attackEnded();
 				}
 
 				return true;

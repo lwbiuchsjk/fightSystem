@@ -112,6 +112,7 @@ var ShowLayer = cc.Layer.extend({
         var attackProgress = this.attackProgress;
         var upAction = this.attackEasyUp;
         if (upAction.getTarget() == null) {
+            attackProgress.moving = true;
             attackProgress.runAction(upAction);
         }
     },
@@ -124,6 +125,7 @@ var ShowLayer = cc.Layer.extend({
         var attackProgress = this.attackProgress;
         var upAction = this.attackHardUp;
         if (upAction.getTarget() == null) {
+            attackProgress.moving = true;
             attackProgress.runAction(upAction);
         }
     },
@@ -236,8 +238,8 @@ var ShowLayer = cc.Layer.extend({
                 this.hardButton.setTexture(res.hardNo);
             }
         } else {
-            this.easyButton.setTexture(res.easyAttack);
-            this.hardButton.setTexture(res.hardAttack);
+            this.easyButton.setTexture(res["easy" + this.playerAttackEnergy]);
+            this.hardButton.setTexture(res["hard" + this.playerAttackEnergy]);
         }
         if (FLAG == null) {
             this.easyButton.removeFromParent();
@@ -247,11 +249,13 @@ var ShowLayer = cc.Layer.extend({
         this.attackFinished();
     },
     attackProgressActionStopped: function() {
-        if (this.attackEasyUp.getTarget() != null || this.attackHardUp.getTarget() != null) {
-            //this.attackProgress.stopAction(this.attackEasyUp);
+        var progress = this.attackProgress;
+        if (progress.moving) {
             this.attackProgress.stopAllActions();
             this.attackEasyUp.setTarget(null);
+            //this.attackProgress.stopAction(this.attackEasyUp);
             this.attackHardUp.setTarget(null);
+            progress.moving = false;
         }
     },
     noAttack: function() {
@@ -264,7 +268,7 @@ var ShowLayer = cc.Layer.extend({
 
     /**
      *
-     * below is the position action series.
+     * below is the POSITION_ACTION series.
      *
      */
     noPosition: function() {
@@ -673,8 +677,19 @@ var ShowLayer = cc.Layer.extend({
         this.addChild(defenceProgressMask);
 
         var attackProgress = new cc.Sprite(res.attackProgress);
-        attackProgress.x = attackMe.x + Config.ATTACK_PROGRESS_X;
-        attackProgress.y = attackMe.y + Config.ATTACK_PROGRESS_Y;
+        attackProgress.attr({
+            x : attackMe.x + Config.ATTACK_PROGRESS_X,
+            y : attackMe.y + Config.ATTACK_PROGRESS_Y,
+            MOVE_FLAG : false,
+            get moving() {
+                return this.MOVE_FLAG;
+            },
+            set moving(value) {
+                this.MOVE_FLAG = value;
+            }
+        });
+        //attackProgress.x = attackMe.x + Config.ATTACK_PROGRESS_X;
+        //attackProgress.y = attackMe.y + Config.ATTACK_PROGRESS_Y;
         var attackStencil = new cc.Sprite(res.attackProgress);
         attackStencil.x = attackProgress.x;
         attackStencil.y = attackProgress.y;

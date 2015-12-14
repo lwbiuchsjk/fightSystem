@@ -4,16 +4,18 @@
 var StatusCalculateLayer = cc.Layer.extend({
 	showLayer: null,
 	characterFactory: null,
+	AIFactory: null,
 
 	ctor: function() {
 		this._super();
 		this.init();
 		this.setName(Config.STATUS_CALCULATE_LAYER);
-		this.characterFactory = new CharacterFactory();
+		this.characterFactory = new InstanceFactory(Character);
+		this.AIFactory = new InstanceFactory(EnemyAI);
 
 		var player = new Fighter();
 		player.setName(Config.PLAYER);
-		this.characterFactory.loadCharacter(player.data, player.getName());
+		this.characterFactory.loadTemplate(player.data, player.getName());
 		this.addChild(player);
 		this._initEnemies();
 		//this.addChild(new test());  //DEBUG
@@ -26,7 +28,7 @@ var StatusCalculateLayer = cc.Layer.extend({
 	_initEnemies: function() {
 		var enemy = new Fighter();
 		enemy.setName(Config.ENEMY.category);
-		this.characterFactory.loadCharacter(enemy.data, enemy.getName());
+		this.characterFactory.loadTemplate(enemy.data, enemy.getName());
 		this.addChild(enemy);
 	},
 
@@ -40,7 +42,9 @@ var StatusCalculateLayer = cc.Layer.extend({
 		player.setTarget(enemy);
 		enemy.setEnemy(player, Config.enemyFacedToMe);
 		enemy.setTarget(player);
-		var enemyAi = new EnemyAi(enemy, 0.3, this.getParent().eventCenter, this.showLayer);
+
+		var enemyAi = new AIStrategy(enemy, 0.3, this.getParent().eventCenter, this.showLayer);
+		this.AIFactory.loadTemplate(enemyAi.data, enemy.getName());
 		enemy.AI = enemyAi;
 		enemy.addChild(enemyAi);
 	},

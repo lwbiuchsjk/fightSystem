@@ -20,7 +20,7 @@
         "src/FlowControlLayer.js",
         "src/StatusCalculateLayer.js",
         "src/Characters.js",
-        "src/AiTemplate.js",
-        "src/EnemyAi.js"
+        "src/AIStrategy.js",
+        "src/EnemyAI.js"
     ]
 }
