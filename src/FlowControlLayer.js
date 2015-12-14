@@ -652,6 +652,8 @@ var SysFlowControl = cc.Layer.extend({
 		this.showLayer = this.getParent().getChildByName(Config.SHOW_LAYER);
 		this.operateLayer = this.getParent().getChildByName(Config.OPERATE_LAYER);
 		this.eventCenter = this.getParent().eventCenter;
+
+		this.eventCenter.dispatchEvent(Config.events.INIT_SHOW_LAYER, {time: Date.now()});
 		//this.player = this.statusCalculateLayer.getChildByName(Config.PLAYER);
 		//this._setPositionLabel();
 

@@ -533,9 +533,11 @@ var ShowLayer = cc.Layer.extend({
     onEnter: function() {
         this._super();
         this.eventCenter = this.getParent().eventCenter;
+        /*
         this.scheduleOnce(function() {
             this.eventCenter.dispatchEvent(Config.events.INIT_SHOW_LAYER, {time: Date.now()});
         }.bind(this));
+        */
     },
     /**
      *
