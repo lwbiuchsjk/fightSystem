@@ -79,7 +79,7 @@ var InstanceFactory = cc.Class.extend({
 		var proto = this.template.proto;
 		for (var i in proto) {
 			if (!this._isPrivate(i)) {
-				if (typeof proto[i] == "object") {
+				if (typeof(proto[i]) == "object") {
 					target[i] = Object.create(proto[i]);
 				} else {
 					target[i] = proto[i];
@@ -91,7 +91,7 @@ var InstanceFactory = cc.Class.extend({
 				var flag = this._navigateProperty(i, [])[0];
 				var ele = target[flag];
 				for (var j in ele) {
-					if (typeof proto[i] == "object") {
+					if (typeof(proto[i]) == "object") {
 						ele[j] = Object.create(proto[i]);
 					} else {
 						ele[j] = proto[i];
@@ -135,10 +135,10 @@ var InstanceFactory = cc.Class.extend({
 		var that = this;
 		for (var i in instance) {
 			var ele = instance[i];
-			if (typeof ele == "object") {
+			if (typeof(ele) == "object") {
 				that._initInstance(ele)
 			} else
-			if(typeof ele == "string") {
+			if(typeof(ele) == "string") {
 				instance[i] = null;
 			}
 		}
