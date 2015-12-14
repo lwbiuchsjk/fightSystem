@@ -33,7 +33,7 @@ var Character = {
 		},
 		_singleEnergy: {
 			energyDurationBegin: "energyDurationBegin",
-			energyQuantity: "energyQuantity",
+			energyQuantity: 0,
 			energyDuration: "energyDuration",
 		},
 		singleEnergy: [{},{},{},{},{}],//"singleEnergy"
