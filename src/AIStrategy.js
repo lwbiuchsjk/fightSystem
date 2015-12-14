@@ -94,7 +94,7 @@ var AIStrategy = cc.Node.extend({
 	},
 	onEnter: function() {
 		this._super();
-		//this._optimizedSchedule(this.checkCount, this.me.status.frameTime, cc.REPEAT_FOREVER);
+		this._optimizedSchedule(this.checkCount, this.me.status.frameTime, cc.REPEAT_FOREVER);
 		this._resetInstinct();
 	},
 	checkCount: function() {
